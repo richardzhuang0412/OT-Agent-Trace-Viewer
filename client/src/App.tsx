@@ -5,12 +5,16 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import Home from "@/pages/Home";
 import TaskPage from "@/pages/TaskPage";
+import DatasetsPage from "@/pages/DatasetsPage";
+import DatasetRowsPage from "@/pages/DatasetRowsPage";
 import NotFound from "@/pages/not-found";
 
 function Router() {
   return (
     <Switch>
       <Route path="/task/:date/:taskId" component={TaskPage} />
+      <Route path="/datasets/:datasetId" component={DatasetRowsPage} />
+      <Route path="/datasets" component={DatasetsPage} />
       <Route path="/" component={Home} />
       <Route component={NotFound} />
     </Switch>

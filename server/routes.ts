@@ -1,10 +1,12 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { S3Service } from "./services/s3Service";
+import { HfService } from "./services/hfService";
 import { z } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   const s3Service = new S3Service();
+  const hfService = new HfService();
 
   // Get S3 hierarchy (dates -> tasks -> models)
   app.get("/api/hierarchy", async (req, res) => {
@@ -131,6 +133,77 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error searching:", error);
       res.status(500).json({ error: "Search failed" });
+    }
+  });
+
+  // HuggingFace dataset routes
+  app.get("/api/hf/datasets", async (req, res) => {
+    try {
+      const { author } = req.query;
+      const datasets = await hfService.listDatasets(author as string || 'mlfoundations-dev');
+      res.json(datasets);
+    } catch (error) {
+      console.error("Error fetching HuggingFace datasets:", error);
+      res.status(500).json({ error: "Failed to fetch datasets" });
+    }
+  });
+
+  app.get("/api/hf/rows", async (req, res) => {
+    try {
+      const { dataset, config, split, offset, length } = req.query;
+      
+      if (!dataset || typeof dataset !== 'string') {
+        return res.status(400).json({ error: "Missing dataset parameter" });
+      }
+
+      const rows = await hfService.getDatasetRows(
+        dataset,
+        config as string || 'default',
+        split as string || 'train',
+        parseInt(offset as string) || 0,
+        parseInt(length as string) || 100
+      );
+      
+      res.json(rows);
+    } catch (error) {
+      console.error("Error fetching dataset rows:", error);
+      res.status(500).json({ error: "Failed to fetch dataset rows" });
+    }
+  });
+
+  app.post("/api/hf/extract-tar", async (req, res) => {
+    try {
+      const { tarUrl, tarBase64 } = req.body;
+      
+      let files;
+      if (tarUrl) {
+        files = await hfService.extractTarFromUrl(tarUrl);
+      } else if (tarBase64) {
+        files = await hfService.extractTarFromBase64(tarBase64);
+      } else {
+        return res.status(400).json({ error: "Missing tarUrl or tarBase64 parameter" });
+      }
+      
+      res.json({ files });
+    } catch (error) {
+      console.error("Error extracting tar:", error);
+      res.status(500).json({ error: "Failed to extract tar file" });
+    }
+  });
+
+  app.post("/api/hf/judge", async (req, res) => {
+    try {
+      const { files } = req.body;
+      
+      if (!files || !Array.isArray(files)) {
+        return res.status(400).json({ error: "Missing files parameter" });
+      }
+      
+      const result = await hfService.runLmJudge(files);
+      res.json(result);
+    } catch (error) {
+      console.error("Error running LM judge:", error);
+      res.status(500).json({ error: "Failed to run LM judge analysis" });
     }
   });
 

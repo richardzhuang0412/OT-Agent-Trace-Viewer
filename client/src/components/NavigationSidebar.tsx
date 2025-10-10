@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useLocation } from "wouter";
-import { Search, Filter, Calendar, Terminal, Bot, ChevronDown, ChevronRight, ExternalLink } from "lucide-react";
+import { useLocation, Link } from "wouter";
+import { Search, Filter, Calendar, Terminal, Bot, ChevronDown, ChevronRight, ExternalLink, Database } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -98,6 +98,12 @@ export default function NavigationSidebar({ onSelectTaskRun, selectedTaskRun }: 
       <div className="p-4 border-b border-border">
         <h1 className="text-lg font-semibold text-foreground">Terminal-Bench Viewer</h1>
         <p className="text-sm text-muted-foreground mt-1">s3://t-bench-mam/tb-2.0-audit/</p>
+        <Link href="/datasets">
+          <Button variant="outline" size="sm" className="mt-3 w-full" data-testid="button-datasets">
+            <Database className="h-4 w-4 mr-2" />
+            HuggingFace Datasets
+          </Button>
+        </Link>
       </div>
 
       {/* Search and Filters */}

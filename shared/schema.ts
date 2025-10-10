@@ -79,3 +79,58 @@ export type AgentCastHeader = z.infer<typeof agentCastHeaderSchema>;
 export type S3File = z.infer<typeof s3FileSchema>;
 export type TaskRun = z.infer<typeof taskRunSchema>;
 export type S3Hierarchy = z.infer<typeof s3HierarchySchema>;
+
+// HuggingFace dataset schemas
+export const hfDatasetSchema = z.object({
+  id: z.string(),
+  author: z.string().optional(),
+  sha: z.string().optional(),
+  lastModified: z.string().optional(),
+  private: z.boolean().optional(),
+  disabled: z.boolean().optional(),
+  gated: z.string().optional(),
+  downloads: z.number().optional(),
+  likes: z.number().optional(),
+  tags: z.array(z.string()).optional(),
+});
+
+export const hfDatasetRowSchema = z.object({
+  row_idx: z.number(),
+  row: z.record(z.any()),
+  truncated_cells: z.array(z.string()).optional(),
+});
+
+export const hfDatasetRowsResponseSchema = z.object({
+  features: z.array(z.object({
+    feature_idx: z.number(),
+    name: z.string(),
+    type: z.record(z.any()),
+  })),
+  rows: z.array(hfDatasetRowSchema),
+  num_rows_total: z.number(),
+  num_rows_per_page: z.number(),
+  partial: z.boolean().optional(),
+});
+
+export const tarFileContentSchema = z.object({
+  path: z.string(),
+  type: z.string(),
+  size: z.number(),
+  content: z.string().optional(),
+});
+
+export const lmJudgeResultSchema = z.object({
+  analysis: z.string(),
+  failures: z.array(z.object({
+    issue: z.string(),
+    severity: z.enum(['low', 'medium', 'high', 'critical']),
+    explanation: z.string(),
+  })),
+  summary: z.string(),
+});
+
+export type HfDataset = z.infer<typeof hfDatasetSchema>;
+export type HfDatasetRow = z.infer<typeof hfDatasetRowSchema>;
+export type HfDatasetRowsResponse = z.infer<typeof hfDatasetRowsResponseSchema>;
+export type TarFileContent = z.infer<typeof tarFileContentSchema>;
+export type LmJudgeResult = z.infer<typeof lmJudgeResultSchema>;
