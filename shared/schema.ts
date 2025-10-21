@@ -120,13 +120,24 @@ export const tarFileContentSchema = z.object({
 });
 
 export const lmJudgeResultSchema = z.object({
-  analysis: z.string(),
-  failures: z.array(z.object({
-    issue: z.string(),
-    severity: z.enum(['low', 'medium', 'high', 'critical']),
-    explanation: z.string(),
-    count: z.number(),
-  })),
+  runDetails: z.object({
+    config: z.record(z.any()).nullable().optional(),
+    result: z.record(z.any()).nullable().optional(),
+    exception: z.string().nullable().optional(),
+  }),
+  errorCounts: z.object({
+    functionCallError: z.number(),
+    malformedJson: z.number(),
+    factualComputationalError: z.number(),
+    exceededContextWindow: z.number(),
+    misunderstoodInstructions: z.number(),
+    shellToolMisuse: z.number(),
+    noTaskConfirmation: z.number(),
+    exhaustedDiskSpace: z.number(),
+    hallucinatedSolutions: z.number(),
+    systemFailure: z.number(),
+    otherAgentError: z.number(),
+  }),
   summary: z.string(),
 });
 

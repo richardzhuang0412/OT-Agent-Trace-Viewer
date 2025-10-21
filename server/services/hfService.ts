@@ -137,41 +137,55 @@ export class HfService {
       // the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
       const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
+      // Extract key files for run details
+      const configFile = tarContents.find(f => f.path.endsWith('config.json'));
+      const resultFile = tarContents.find(f => f.path.endsWith('result.json'));
+      const exceptionFile = tarContents.find(f => f.path.endsWith('exception.txt'));
+
       const contentsForAnalysis = tarContents
         .filter(f => f.content)
         .map(f => `File: ${f.path}\nType: ${f.type}\nSize: ${f.size}\n\nContent:\n${f.content?.substring(0, 5000)}`)
         .join('\n\n---\n\n');
 
-      const prompt = `You are an expert test analyzer. Analyze the following extracted tar file contents from a test run and identify what failed.
+      const prompt = `You are an expert test analyzer. Analyze the following extracted tar file contents from a test run and count how many times each type of error occurred.
 
 ${contentsForAnalysis}
 
-IMPORTANT: For each type of error or issue you identify, count how many times it occurs across all the files. Group similar errors together and provide the total count.
+IMPORTANT: Count how many times each error category occurs. Return a count for ALL categories below, even if the count is 0.
 
-Classify each error into one of the following categories:
-- Agent called a function incorrectly
-- Agent produced malformed JSON
-- Agent made a factual or computational error
-- Agent exceeded context window
-- Agent misunderstood task instructions or that it was a terminal agent
-- Agent misused a shell tool
-- Agent did not confirm task completion when prompted
-- Agent exhausted disk space
-- Agent hallucinated solutions or attempted to cheat (this includes mocking files that needed to be real or pretending to have solved the problem)
-- Non-agent system failure (exhausted memory, exhausted disk space, bad environment, external kill signal, et cetera)
-- Any other agent-caused error
+Error categories:
+1. functionCallError - Agent called a function incorrectly
+2. malformedJson - Agent produced malformed JSON
+3. factualComputationalError - Agent made a factual or computational error
+4. exceededContextWindow - Agent exceeded context window
+5. misunderstoodInstructions - Agent misunderstood task instructions or that it was a terminal agent
+6. shellToolMisuse - Agent misused a shell tool
+7. noTaskConfirmation - Agent did not confirm task completion when prompted
+8. exhaustedDiskSpace - Agent exhausted disk space
+9. hallucinatedSolutions - Agent hallucinated solutions or attempted to cheat (this includes mocking files that needed to be real or pretending to have solved the problem)
+10. systemFailure - Non-agent system failure (exhausted memory, exhausted disk space, bad environment, external kill signal, et cetera)
+11. otherAgentError - Any other agent-caused error
 
 Provide your analysis in JSON format with the following structure:
 {
-  "analysis": "Overall analysis of the test run",
-  "failures": [
-    {
-      "issue": "One of the error categories listed above",
-      "severity": "low|medium|high|critical",
-      "explanation": "Detailed explanation of what went wrong",
-      "count": <number of times this error occurred>
-    }
-  ],
+  "runDetails": {
+    "config": <parsed config.json if available, otherwise null>,
+    "result": <parsed result.json if available, otherwise null>,
+    "exception": <exception.txt content if available, otherwise null>
+  },
+  "errorCounts": {
+    "functionCallError": <count>,
+    "malformedJson": <count>,
+    "factualComputationalError": <count>,
+    "exceededContextWindow": <count>,
+    "misunderstoodInstructions": <count>,
+    "shellToolMisuse": <count>,
+    "noTaskConfirmation": <count>,
+    "exhaustedDiskSpace": <count>,
+    "hallucinatedSolutions": <count>,
+    "systemFailure": <count>,
+    "otherAgentError": <count>
+  },
   "summary": "Brief summary of findings"
 }`;
 
@@ -193,19 +207,24 @@ Provide your analysis in JSON format with the following structure:
 
       const rawResult = JSON.parse(response.choices[0].message.content || '{}');
       
-      // Ensure all failures have a count field, defaulting to 1 if missing
-      const failures = (rawResult.failures || []).map((failure: any) => ({
-        issue: failure.issue || 'Unknown issue',
-        severity: ['low', 'medium', 'high', 'critical'].includes(failure.severity) 
-          ? failure.severity 
-          : 'medium',
-        explanation: failure.explanation || 'No explanation provided',
-        count: typeof failure.count === 'number' && failure.count > 0 ? failure.count : 1,
-      }));
+      // Ensure all error counts exist and are numbers, defaulting to 0 if missing
+      const errorCounts = {
+        functionCallError: typeof rawResult.errorCounts?.functionCallError === 'number' ? rawResult.errorCounts.functionCallError : 0,
+        malformedJson: typeof rawResult.errorCounts?.malformedJson === 'number' ? rawResult.errorCounts.malformedJson : 0,
+        factualComputationalError: typeof rawResult.errorCounts?.factualComputationalError === 'number' ? rawResult.errorCounts.factualComputationalError : 0,
+        exceededContextWindow: typeof rawResult.errorCounts?.exceededContextWindow === 'number' ? rawResult.errorCounts.exceededContextWindow : 0,
+        misunderstoodInstructions: typeof rawResult.errorCounts?.misunderstoodInstructions === 'number' ? rawResult.errorCounts.misunderstoodInstructions : 0,
+        shellToolMisuse: typeof rawResult.errorCounts?.shellToolMisuse === 'number' ? rawResult.errorCounts.shellToolMisuse : 0,
+        noTaskConfirmation: typeof rawResult.errorCounts?.noTaskConfirmation === 'number' ? rawResult.errorCounts.noTaskConfirmation : 0,
+        exhaustedDiskSpace: typeof rawResult.errorCounts?.exhaustedDiskSpace === 'number' ? rawResult.errorCounts.exhaustedDiskSpace : 0,
+        hallucinatedSolutions: typeof rawResult.errorCounts?.hallucinatedSolutions === 'number' ? rawResult.errorCounts.hallucinatedSolutions : 0,
+        systemFailure: typeof rawResult.errorCounts?.systemFailure === 'number' ? rawResult.errorCounts.systemFailure : 0,
+        otherAgentError: typeof rawResult.errorCounts?.otherAgentError === 'number' ? rawResult.errorCounts.otherAgentError : 0,
+      };
       
       const result = {
-        analysis: rawResult.analysis || 'No analysis available',
-        failures,
+        runDetails: rawResult.runDetails || {},
+        errorCounts,
         summary: rawResult.summary || 'No summary available',
       };
 

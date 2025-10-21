@@ -150,14 +150,18 @@ export default function DatasetRowsPage() {
     setCurrentPage(prev => Math.max(0, prev - 1));
   };
 
-  const getSeverityColor = (severity: string) => {
-    switch (severity) {
-      case 'critical': return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400';
-      case 'high': return 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400';
-      case 'medium': return 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400';
-      case 'low': return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400';
-      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400';
-    }
+  const errorLabels: Record<keyof LmJudgeResult['errorCounts'], string> = {
+    functionCallError: 'Agent called a function incorrectly',
+    malformedJson: 'Agent produced malformed JSON',
+    factualComputationalError: 'Agent made a factual or computational error',
+    exceededContextWindow: 'Agent exceeded context window',
+    misunderstoodInstructions: 'Agent misunderstood task instructions or that it was a terminal agent',
+    shellToolMisuse: 'Agent misused a shell tool',
+    noTaskConfirmation: 'Agent did not confirm task completion when prompted',
+    exhaustedDiskSpace: 'Agent exhausted disk space',
+    hallucinatedSolutions: 'Agent hallucinated solutions or attempted to cheat',
+    systemFailure: 'Non-agent system failure',
+    otherAgentError: 'Any other agent-caused error',
   };
 
   if (isLoading) {
@@ -356,7 +360,7 @@ export default function DatasetRowsPage() {
           </div>
 
           <Dialog open={isJudgeModalOpen} onOpenChange={setIsJudgeModalOpen}>
-              <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto bg-black text-white">
+              <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto bg-black text-white">
                 <DialogHeader>
                   <DialogTitle className="text-white flex items-center gap-2">
                     <AlertCircle className="h-5 w-5" />
@@ -364,55 +368,79 @@ export default function DatasetRowsPage() {
                   </DialogTitle>
                 </DialogHeader>
                 {judgeResult && (
-                  <div className="space-y-4">
+                  <div className="space-y-6">
                     <div>
                       <h4 className="font-semibold mb-2 text-white">Summary</h4>
                       <p className="text-sm text-gray-400">{judgeResult.summary}</p>
                     </div>
 
-                    <div>
-                      <h4 className="font-semibold mb-2 text-white">Analysis</h4>
-                      <p className="text-sm text-gray-400">{judgeResult.analysis}</p>
-                    </div>
+                    {judgeResult.runDetails && (
+                      <div className="space-y-3">
+                        <h4 className="font-semibold text-white">Run Details</h4>
+                        
+                        {judgeResult.runDetails.config && (
+                          <div className="bg-gray-900 rounded-lg p-3 border border-gray-700">
+                            <h5 className="text-sm font-medium text-gray-300 mb-2">Config</h5>
+                            <pre className="text-xs text-gray-400 overflow-x-auto">
+                              {JSON.stringify(judgeResult.runDetails.config, null, 2)}
+                            </pre>
+                          </div>
+                        )}
 
-                    {judgeResult.failures.length > 0 && (
-                      <div>
-                        <h4 className="font-semibold mb-3 text-white">
-                          Failures ({judgeResult.failures.length})
-                        </h4>
-                        <div className="space-y-3">
-                          {judgeResult.failures.map((failure, idx) => (
-                            <div
-                              key={idx}
-                              className="border border-gray-700 rounded-lg p-3"
-                              data-testid={`failure-${idx}`}
-                            >
-                              <div className="flex items-start gap-2 mb-2">
-                                {failure.severity === 'critical' || failure.severity === 'high' ? (
-                                  <XCircle className="h-5 w-5 text-red-500 mt-0.5" />
-                                ) : (
-                                  <AlertCircle className="h-5 w-5 text-amber-500 mt-0.5" />
-                                )}
-                                <div className="flex-1">
-                                  <div className="flex items-center gap-2 mb-1 flex-wrap">
-                                    <span className="font-medium text-white">{failure.issue}</span>
-                                    <Badge className={getSeverityColor(failure.severity)}>
-                                      {failure.severity}
-                                    </Badge>
-                                    <Badge variant="outline" className="bg-gray-800 text-gray-300 border-gray-600">
-                                      Count: {failure.count}
-                                    </Badge>
-                                  </div>
-                                  <p className="text-sm text-gray-400">
-                                    {failure.explanation}
-                                  </p>
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
+                        {judgeResult.runDetails.result && (
+                          <div className="bg-gray-900 rounded-lg p-3 border border-gray-700">
+                            <h5 className="text-sm font-medium text-gray-300 mb-2">Result</h5>
+                            <pre className="text-xs text-gray-400 overflow-x-auto">
+                              {JSON.stringify(judgeResult.runDetails.result, null, 2)}
+                            </pre>
+                          </div>
+                        )}
+
+                        {judgeResult.runDetails.exception && (
+                          <div className="bg-gray-900 rounded-lg p-3 border border-gray-700">
+                            <h5 className="text-sm font-medium text-gray-300 mb-2">Exception</h5>
+                            <pre className="text-xs text-gray-400 whitespace-pre-wrap">
+                              {judgeResult.runDetails.exception}
+                            </pre>
+                          </div>
+                        )}
                       </div>
                     )}
+
+                    <div>
+                      <h4 className="font-semibold mb-3 text-white">Error Counts</h4>
+                      <div className="border border-gray-700 rounded-lg overflow-hidden">
+                        <Table>
+                          <TableHeader>
+                            <TableRow className="border-gray-700 hover:bg-gray-900">
+                              <TableHead className="text-gray-300">Error Type</TableHead>
+                              <TableHead className="text-gray-300 text-right">Count</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {Object.entries(judgeResult.errorCounts).map(([key, count]) => (
+                              <TableRow
+                                key={key}
+                                className="border-gray-700 hover:bg-gray-900"
+                                data-testid={`error-row-${key}`}
+                              >
+                                <TableCell className="text-gray-400 text-sm">
+                                  {errorLabels[key as keyof typeof errorLabels]}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <Badge 
+                                    variant={count > 0 ? "default" : "outline"}
+                                    className={count > 0 ? "bg-red-600 text-white" : "bg-gray-800 text-gray-400 border-gray-600"}
+                                  >
+                                    {count}
+                                  </Badge>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
                   </div>
                 )}
               </DialogContent>
