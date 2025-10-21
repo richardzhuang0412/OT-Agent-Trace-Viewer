@@ -8,6 +8,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const s3Service = new S3Service();
   const hfService = new HfService();
 
+  // Health check endpoint for deployment verification
+  app.get("/api/health", (_req, res) => {
+    res.json({ 
+      status: "ok", 
+      timestamp: new Date().toISOString(),
+      environment: process.env.NODE_ENV || "development"
+    });
+  });
+
   // Get S3 hierarchy (dates -> tasks -> models)
   app.get("/api/hierarchy", async (req, res) => {
     try {
