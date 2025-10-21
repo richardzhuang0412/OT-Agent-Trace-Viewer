@@ -182,12 +182,12 @@ KEY FILES EXTRACTED:
 - Exception: ${exceptionData || 'Not found'}
 
 INSTRUCTIONS:
-1. First, examine config.json to understand the dataset type and agent being used
+1. First, examine config.json to understand the dataset link and agent being used
 2. Look at result.json to see the outcome of the run
 3. Read exception.txt if available to identify errors
 4. Count how many times each error category occurs across ALL files
 5. Create a brief summary that includes ONLY:
-   - The dataset type from config.json (if available)
+   - The dataset link from config.json (if available)
    - The agent details from config.json (if available)
 
 IMPORTANT: Count how many times each error category occurs. Return a count for ALL categories below, even if the count is 0.
@@ -220,7 +220,7 @@ Provide your analysis in JSON format with the following structure (DO NOT includ
     "systemFailure": <count>,
     "otherAgentError": <count>
   },
-  "summary": "<Brief summary with ONLY dataset type and agent details - no JSON objects or full config details>"
+  "summary": "<Brief summary with ONLY dataset link and agent details - no JSON objects or full config details>"
 }`;
 
       const response = await openai.chat.completions.create({
@@ -259,13 +259,13 @@ Provide your analysis in JSON format with the following structure (DO NOT includ
         otherAgentError: typeof rawResult.errorCounts?.otherAgentError === 'number' ? rawResult.errorCounts.otherAgentError : 0,
       };
       
-      // Generate summary from config data if available - only include dataset type and agent details
+      // Generate summary from config data if available - only include dataset link and agent details
       let summary = rawResult.summary || '';
       if (!summary && configData) {
         const config = configData as any;
         
-        // Extract dataset type from nested structure
-        const datasetType = config.task?.dataset_type || config.task?.type || config.dataset_type || config.type || '';
+        // Extract dataset link from nested structure
+        const datasetLink = config.task?.dataset_link || config.task?.link || config.dataset_link || config.link || '';
         
         // Extract agent details from nested structure
         let agent = '';
@@ -282,7 +282,7 @@ Provide your analysis in JSON format with the following structure (DO NOT includ
         }
         
         const parts = [];
-        if (datasetType) parts.push(`Dataset: ${datasetType}`);
+        if (datasetLink) parts.push(`Dataset: ${datasetLink}`);
         if (agent) parts.push(`Agent: ${agent}`);
         
         summary = parts.length > 0 ? parts.join(' | ') : 'No summary available';
