@@ -173,7 +173,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         config as string || 'default',
         split as string || 'train',
         parseInt(offset as string) || 0,
-        parseInt(length as string) || 100
+        parseInt(length as string) || 10  // Reduced from 100 to 10 to avoid huge responses
       );
       
       console.log('[Route /api/hf/rows] Successfully fetched', rows.rows?.length || 0, 'rows');

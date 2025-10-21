@@ -29,7 +29,8 @@ export default function DatasetRowsPage() {
   const { data: rowsData, isLoading, error: rowsError } = useQuery<HfDatasetRowsResponse>({
     queryKey: ['/api/hf/rows', datasetId],
     queryFn: async () => {
-      const response = await fetch(`/api/hf/rows?dataset=${encodeURIComponent(datasetId)}`);
+      // Request only 10 rows at a time to avoid huge responses (each row can be 1-2MB)
+      const response = await fetch(`/api/hf/rows?dataset=${encodeURIComponent(datasetId)}&length=10`);
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         console.error('Failed to fetch dataset rows:', {
