@@ -8,6 +8,7 @@ import { ArrowLeft, Loader2, FileArchive, CheckCircle, XCircle, AlertCircle } fr
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
 import type { HfDatasetRowsResponse, TarFileContent, LmJudgeResult } from '@shared/schema';
@@ -19,6 +20,7 @@ export default function DatasetRowsPage() {
   const [tarContents, setTarContents] = useState<TarFileContent[] | null>(null);
   const [judgeResult, setJudgeResult] = useState<LmJudgeResult | null>(null);
   const [currentPage, setCurrentPage] = useState(0);
+  const [isJudgeModalOpen, setIsJudgeModalOpen] = useState(false);
   const { toast } = useToast();
   
   const filesPerPage = 100;
@@ -90,6 +92,7 @@ export default function DatasetRowsPage() {
     },
     onSuccess: (data: LmJudgeResult) => {
       setJudgeResult(data);
+      setIsJudgeModalOpen(true);
       toast({
         title: 'Analysis Complete',
         description: 'LM judge has analyzed the test run',
@@ -240,15 +243,25 @@ export default function DatasetRowsPage() {
                     <FileArchive className="h-5 w-5" />
                     Tar Contents ({tarContents.length} files)
                   </CardTitle>
-                  <Button
-                    onClick={handleRunJudge}
-                    disabled={judgeMutation.isPending}
-                    className="mt-2"
-                    data-testid="button-run-judge"
-                  >
-                    {judgeMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                    Run LM Judge
-                  </Button>
+                  <div className="flex gap-2 mt-2">
+                    <Button
+                      onClick={handleRunJudge}
+                      disabled={judgeMutation.isPending}
+                      data-testid="button-run-judge"
+                    >
+                      {judgeMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                      Run LM Judge
+                    </Button>
+                    {judgeResult && (
+                      <Button
+                        onClick={() => setIsJudgeModalOpen(true)}
+                        variant="outline"
+                        data-testid="button-view-results"
+                      >
+                        View Results
+                      </Button>
+                    )}
+                  </div>
                 </CardHeader>
                 <CardContent>
                   <Accordion type="single" collapsible className="w-full">
@@ -307,63 +320,65 @@ export default function DatasetRowsPage() {
               </Card>
             )}
 
-            {judgeResult && (
-              <Card className="bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800">
-                <CardHeader>
-                  <CardTitle className="text-foreground dark:text-white flex items-center gap-2">
+            <Dialog open={isJudgeModalOpen} onOpenChange={setIsJudgeModalOpen}>
+              <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto bg-white dark:bg-gray-900">
+                <DialogHeader>
+                  <DialogTitle className="text-foreground dark:text-white flex items-center gap-2">
                     <AlertCircle className="h-5 w-5" />
                     LM Judge Analysis
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div>
-                    <h4 className="font-semibold mb-2 text-foreground dark:text-white">Summary</h4>
-                    <p className="text-sm text-muted-foreground dark:text-gray-400">{judgeResult.summary}</p>
-                  </div>
-
-                  <div>
-                    <h4 className="font-semibold mb-2 text-foreground dark:text-white">Analysis</h4>
-                    <p className="text-sm text-muted-foreground dark:text-gray-400">{judgeResult.analysis}</p>
-                  </div>
-
-                  {judgeResult.failures.length > 0 && (
+                  </DialogTitle>
+                </DialogHeader>
+                {judgeResult && (
+                  <div className="space-y-4">
                     <div>
-                      <h4 className="font-semibold mb-3 text-foreground dark:text-white">
-                        Failures ({judgeResult.failures.length})
-                      </h4>
-                      <div className="space-y-3">
-                        {judgeResult.failures.map((failure, idx) => (
-                          <div
-                            key={idx}
-                            className="border border-border dark:border-gray-700 rounded-lg p-3"
-                            data-testid={`failure-${idx}`}
-                          >
-                            <div className="flex items-start gap-2 mb-2">
-                              {failure.severity === 'critical' || failure.severity === 'high' ? (
-                                <XCircle className="h-5 w-5 text-red-500 mt-0.5" />
-                              ) : (
-                                <AlertCircle className="h-5 w-5 text-amber-500 mt-0.5" />
-                              )}
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2 mb-1">
-                                  <span className="font-medium text-foreground dark:text-white">{failure.issue}</span>
-                                  <Badge className={getSeverityColor(failure.severity)}>
-                                    {failure.severity}
-                                  </Badge>
+                      <h4 className="font-semibold mb-2 text-foreground dark:text-white">Summary</h4>
+                      <p className="text-sm text-muted-foreground dark:text-gray-400">{judgeResult.summary}</p>
+                    </div>
+
+                    <div>
+                      <h4 className="font-semibold mb-2 text-foreground dark:text-white">Analysis</h4>
+                      <p className="text-sm text-muted-foreground dark:text-gray-400">{judgeResult.analysis}</p>
+                    </div>
+
+                    {judgeResult.failures.length > 0 && (
+                      <div>
+                        <h4 className="font-semibold mb-3 text-foreground dark:text-white">
+                          Failures ({judgeResult.failures.length})
+                        </h4>
+                        <div className="space-y-3">
+                          {judgeResult.failures.map((failure, idx) => (
+                            <div
+                              key={idx}
+                              className="border border-border dark:border-gray-700 rounded-lg p-3"
+                              data-testid={`failure-${idx}`}
+                            >
+                              <div className="flex items-start gap-2 mb-2">
+                                {failure.severity === 'critical' || failure.severity === 'high' ? (
+                                  <XCircle className="h-5 w-5 text-red-500 mt-0.5" />
+                                ) : (
+                                  <AlertCircle className="h-5 w-5 text-amber-500 mt-0.5" />
+                                )}
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <span className="font-medium text-foreground dark:text-white">{failure.issue}</span>
+                                    <Badge className={getSeverityColor(failure.severity)}>
+                                      {failure.severity}
+                                    </Badge>
+                                  </div>
+                                  <p className="text-sm text-muted-foreground dark:text-gray-400">
+                                    {failure.explanation}
+                                  </p>
                                 </div>
-                                <p className="text-sm text-muted-foreground dark:text-gray-400">
-                                  {failure.explanation}
-                                </p>
                               </div>
                             </div>
-                          </div>
-                        ))}
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            )}
+                    )}
+                  </div>
+                )}
+              </DialogContent>
+            </Dialog>
           </div>
         </div>
       </div>
