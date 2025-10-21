@@ -161,10 +161,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { dataset, config, split, offset, length } = req.query;
       
-      console.log('Received request for HF dataset rows:', { dataset, config, split, offset, length });
+      console.log('[Route /api/hf/rows] Received request:', { dataset, config, split, offset, length });
       
       if (!dataset || typeof dataset !== 'string') {
-        console.error('Missing or invalid dataset parameter');
+        console.error('[Route /api/hf/rows] Missing or invalid dataset parameter');
         return res.status(400).json({ error: "Missing dataset parameter" });
       }
 
@@ -176,12 +176,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         parseInt(length as string) || 100
       );
       
+      console.log('[Route /api/hf/rows] Successfully returning', rows.rows?.length || 0, 'rows');
       res.json(rows);
     } catch (error: any) {
-      console.error("Error in /api/hf/rows route:", error);
+      console.error('[Route /api/hf/rows] ===== ERROR CAUGHT IN ROUTE =====');
+      console.error('[Route /api/hf/rows] Error name:', error.name);
+      console.error('[Route /api/hf/rows] Error message:', error.message);
+      console.error('[Route /api/hf/rows] Error statusCode:', error.statusCode);
+      console.error('[Route /api/hf/rows] Error stack:', error.stack);
       
       const statusCode = error.statusCode || 500;
       const errorMessage = error.message || "Failed to fetch dataset rows";
+      
+      console.error('[Route /api/hf/rows] Returning error to client:', { statusCode, errorMessage });
       
       res.status(statusCode).json({ 
         error: errorMessage,

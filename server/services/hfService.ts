@@ -33,8 +33,13 @@ export class HfService {
     offset: number = 0,
     length: number = 100
   ): Promise<HfDatasetRowsResponse> {
+    const startTime = Date.now();
     try {
-      console.log(`Fetching dataset rows from HuggingFace: ${dataset}, config: ${config}, split: ${split}`);
+      console.log('[HF Service] ===== Starting HuggingFace API Request =====');
+      console.log('[HF Service] Dataset:', dataset);
+      console.log('[HF Service] Config:', config, 'Split:', split, 'Offset:', offset, 'Length:', length);
+      console.log('[HF Service] API URL:', this.apiUrl);
+      console.log('[HF Service] Full request URL:', `${this.apiUrl}/rows?dataset=${dataset}&config=${config}&split=${split}&offset=${offset}&length=${length}`);
       
       const response = await axios.get(`${this.apiUrl}/rows`, {
         params: {
@@ -47,29 +52,38 @@ export class HfService {
         timeout: 60000, // 60 second timeout
       });
       
-      console.log(`Successfully fetched ${response.data.rows?.length || 0} rows from HuggingFace`);
+      const duration = Date.now() - startTime;
+      console.log(`[HF Service] ✓ SUCCESS - Fetched ${response.data.rows?.length || 0} rows in ${duration}ms`);
       return response.data;
     } catch (error: any) {
-      console.error('Error fetching dataset rows from HuggingFace:');
-      console.error('URL:', `${this.apiUrl}/rows`);
-      console.error('Params:', { dataset, config, split, offset, length });
+      const duration = Date.now() - startTime;
+      console.error('[HF Service] ✗ FAILED after', duration, 'ms');
+      console.error('[HF Service] Error type:', error.code || 'UNKNOWN');
+      console.error('[HF Service] Error message:', error.message);
       
       if (error.response) {
-        console.error('Response status:', error.response.status);
-        console.error('Response data:', error.response.data);
+        console.error('[HF Service] Got HTTP response with error');
+        console.error('[HF Service] Response status:', error.response.status);
+        console.error('[HF Service] Response statusText:', error.response.statusText);
+        console.error('[HF Service] Response data:', JSON.stringify(error.response.data, null, 2));
+        console.error('[HF Service] Response headers:', JSON.stringify(error.response.headers, null, 2));
         
-        // Preserve the status code by re-throwing the axios error
-        const hfError: any = new Error(`Failed to fetch dataset rows from HuggingFace`);
+        const hfError: any = new Error(`HuggingFace API error: ${error.response.status} ${error.response.statusText}`);
         hfError.statusCode = error.response.status;
         hfError.responseData = error.response.data;
         throw hfError;
       } else if (error.request) {
-        console.error('No response received:', error.message);
-        const hfError: any = new Error(`No response from HuggingFace server`);
+        console.error('[HF Service] No response received from server');
+        console.error('[HF Service] This usually means a network/timeout issue');
+        console.error('[HF Service] Error code:', error.code);
+        console.error('[HF Service] Error stack:', error.stack);
+        
+        const hfError: any = new Error(`No response from HuggingFace server (${error.code || 'NETWORK_ERROR'})`);
         hfError.statusCode = 503;
         throw hfError;
       } else {
-        console.error('Error:', error.message);
+        console.error('[HF Service] Request setup error');
+        console.error('[HF Service] Full error:', error);
         throw error;
       }
     }
