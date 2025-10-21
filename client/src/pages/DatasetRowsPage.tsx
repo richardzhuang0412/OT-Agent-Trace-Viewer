@@ -31,7 +31,13 @@ export default function DatasetRowsPage() {
     queryFn: async () => {
       const response = await fetch(`/api/hf/rows?dataset=${encodeURIComponent(datasetId)}`);
       if (!response.ok) {
-        throw new Error('Failed to fetch dataset rows');
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Failed to fetch dataset rows:', {
+          status: response.status,
+          statusText: response.statusText,
+          errorData
+        });
+        throw new Error(errorData.error || `Failed to fetch dataset rows (${response.status})`);
       }
       return response.json();
     },
