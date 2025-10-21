@@ -356,9 +356,9 @@ export default function DatasetRowsPage() {
           </div>
 
           <Dialog open={isJudgeModalOpen} onOpenChange={setIsJudgeModalOpen}>
-              <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto bg-white dark:bg-gray-900 text-gray-900 dark:text-white">
+              <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto bg-black text-white">
                 <DialogHeader>
-                  <DialogTitle className="text-gray-900 dark:text-white flex items-center gap-2">
+                  <DialogTitle className="text-white flex items-center gap-2">
                     <AlertCircle className="h-5 w-5" />
                     LM Judge Analysis
                   </DialogTitle>
@@ -366,41 +366,41 @@ export default function DatasetRowsPage() {
                 {judgeResult && (
                   <div className="space-y-4">
                     <div>
-                      <h4 className="font-semibold mb-2 text-gray-900 dark:text-white">Summary</h4>
-                      <p className="text-sm text-gray-700 dark:text-gray-300">{judgeResult.summary}</p>
+                      <h4 className="font-semibold mb-2 text-white">Summary</h4>
+                      <p className="text-sm text-gray-400">{judgeResult.summary}</p>
                     </div>
 
                     <div>
-                      <h4 className="font-semibold mb-2 text-gray-900 dark:text-white">Analysis</h4>
-                      <p className="text-sm text-gray-700 dark:text-gray-300">{judgeResult.analysis}</p>
+                      <h4 className="font-semibold mb-2 text-white">Analysis</h4>
+                      <p className="text-sm text-gray-400">{judgeResult.analysis}</p>
                     </div>
 
                     {judgeResult.failures.length > 0 && (
                       <div>
-                        <h4 className="font-semibold mb-3 text-gray-900 dark:text-white">
+                        <h4 className="font-semibold mb-3 text-white">
                           Failures ({judgeResult.failures.length})
                         </h4>
                         <div className="space-y-3">
                           {judgeResult.failures.map((failure, idx) => (
                             <div
                               key={idx}
-                              className="border border-gray-300 dark:border-gray-700 rounded-lg p-3 bg-gray-50 dark:bg-gray-800"
+                              className="border border-gray-700 rounded-lg p-3"
                               data-testid={`failure-${idx}`}
                             >
                               <div className="flex items-start gap-2 mb-2">
                                 {failure.severity === 'critical' || failure.severity === 'high' ? (
-                                  <XCircle className="h-5 w-5 text-red-500 dark:text-red-400 mt-0.5" />
+                                  <XCircle className="h-5 w-5 text-red-500 mt-0.5" />
                                 ) : (
-                                  <AlertCircle className="h-5 w-5 text-amber-500 dark:text-amber-400 mt-0.5" />
+                                  <AlertCircle className="h-5 w-5 text-amber-500 mt-0.5" />
                                 )}
                                 <div className="flex-1">
                                   <div className="flex items-center gap-2 mb-1">
-                                    <span className="font-medium text-gray-900 dark:text-white">{failure.issue}</span>
+                                    <span className="font-medium text-white">{failure.issue}</span>
                                     <Badge className={getSeverityColor(failure.severity)}>
                                       {failure.severity}
                                     </Badge>
                                   </div>
-                                  <p className="text-sm text-gray-700 dark:text-gray-300">
+                                  <p className="text-sm text-gray-400">
                                     {failure.explanation}
                                   </p>
                                 </div>
