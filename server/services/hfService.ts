@@ -205,13 +205,8 @@ Error categories:
 10. systemFailure - Non-agent system failure (exhausted memory, exhausted disk space, bad environment, external kill signal, et cetera)
 11. otherAgentError - Any other agent-caused error
 
-Provide your analysis in JSON format with the following structure:
+Provide your analysis in JSON format with the following structure (DO NOT include any JSON objects or config details):
 {
-  "runDetails": {
-    "config": ${configData ? JSON.stringify(configData) : 'null'},
-    "result": ${resultData ? JSON.stringify(resultData) : 'null'},
-    "exception": ${exceptionData ? JSON.stringify(exceptionData) : 'null'}
-  },
   "errorCounts": {
     "functionCallError": <count>,
     "malformedJson": <count>,
@@ -225,7 +220,7 @@ Provide your analysis in JSON format with the following structure:
     "systemFailure": <count>,
     "otherAgentError": <count>
   },
-  "summary": "<Brief summary with dataset type and agent details only>"
+  "summary": "<Brief summary with ONLY dataset type and agent details - no JSON objects or full config details>"
 }`;
 
       const response = await openai.chat.completions.create({
@@ -295,11 +290,7 @@ Provide your analysis in JSON format with the following structure:
       }
       
       const result = {
-        runDetails: {
-          config: configData,
-          result: resultData,
-          exception: exceptionData,
-        },
+        runDetails: null,
         errorCounts,
         summary,
       };
