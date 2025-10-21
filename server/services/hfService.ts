@@ -241,6 +241,9 @@ Provide your analysis in JSON format with the following structure (DO NOT includ
 
       const rawResult = JSON.parse(response.choices[0].message.content || '{}');
       
+      // Log the raw LLM response for debugging
+      console.log('Raw LLM Response:', JSON.stringify(rawResult, null, 2));
+      
       // Ensure all error counts exist and are numbers, defaulting to 0 if missing
       const errorCounts = {
         functionCallError: typeof rawResult.errorCounts?.functionCallError === 'number' ? rawResult.errorCounts.functionCallError : 0,
