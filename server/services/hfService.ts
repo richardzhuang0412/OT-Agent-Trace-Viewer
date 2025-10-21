@@ -182,14 +182,13 @@ KEY FILES EXTRACTED:
 - Exception: ${exceptionData || 'Not found'}
 
 INSTRUCTIONS:
-1. First, examine config.json to understand what task/path was being tested and what agent was used
+1. First, examine config.json to understand the dataset type and agent being used
 2. Look at result.json to see the outcome of the run
 3. Read exception.txt if available to identify errors
 4. Count how many times each error category occurs across ALL files
-5. Create a summary that includes:
-   - The task path from config.json (if available)
+5. Create a brief summary that includes ONLY:
+   - The dataset type from config.json (if available)
    - The agent details from config.json (if available)
-   - A brief description of what happened in the run
 
 IMPORTANT: Count how many times each error category occurs. Return a count for ALL categories below, even if the count is 0.
 
@@ -226,7 +225,7 @@ Provide your analysis in JSON format with the following structure:
     "systemFailure": <count>,
     "otherAgentError": <count>
   },
-  "summary": "<Summary that includes the task path and agent from config.json, plus brief description of the run outcome>"
+  "summary": "<Brief summary with dataset type and agent details only>"
 }`;
 
       const response = await openai.chat.completions.create({
@@ -262,19 +261,33 @@ Provide your analysis in JSON format with the following structure:
         otherAgentError: typeof rawResult.errorCounts?.otherAgentError === 'number' ? rawResult.errorCounts.otherAgentError : 0,
       };
       
-      // Generate summary from config data if available
+      // Generate summary from config data if available - only include dataset type and agent details
       let summary = rawResult.summary || '';
       if (!summary && configData) {
-        const taskPath = (configData as any).task_path || (configData as any).path || 'Unknown task';
-        const agent = (configData as any).agent || (configData as any).model || 'Unknown agent';
-        summary = `Task: ${taskPath} | Agent: ${agent}`;
+        const config = configData as any;
         
-        if (resultData) {
-          const success = (resultData as any).success ?? (resultData as any).passed;
-          if (success !== undefined && success !== null) {
-            summary += ` | Result: ${success ? 'Success' : 'Failed'}`;
+        // Extract dataset type from nested structure
+        const datasetType = config.task?.dataset_type || config.task?.type || config.dataset_type || config.type || '';
+        
+        // Extract agent details from nested structure
+        let agent = '';
+        if (config.agent) {
+          if (typeof config.agent === 'string') {
+            agent = config.agent;
+          } else if (config.agent.name) {
+            agent = config.agent.name;
+          } else if (config.agent.model) {
+            agent = config.agent.model;
           }
+        } else if (config.model) {
+          agent = typeof config.model === 'string' ? config.model : config.model.name || '';
         }
+        
+        const parts = [];
+        if (datasetType) parts.push(`Dataset: ${datasetType}`);
+        if (agent) parts.push(`Agent: ${agent}`);
+        
+        summary = parts.length > 0 ? parts.join(' | ') : 'No summary available';
       }
       
       if (!summary) {
