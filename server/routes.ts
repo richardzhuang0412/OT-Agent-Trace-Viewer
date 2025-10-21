@@ -161,7 +161,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { dataset, config, split, offset, length } = req.query;
       
+      console.log('Received request for HF dataset rows:', { dataset, config, split, offset, length });
+      
       if (!dataset || typeof dataset !== 'string') {
+        console.error('Missing or invalid dataset parameter');
         return res.status(400).json({ error: "Missing dataset parameter" });
       }
 
@@ -174,9 +177,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
       
       res.json(rows);
-    } catch (error) {
-      console.error("Error fetching dataset rows:", error);
-      res.status(500).json({ error: "Failed to fetch dataset rows" });
+    } catch (error: any) {
+      console.error("Error in /api/hf/rows route:", error);
+      
+      const statusCode = error.statusCode || 500;
+      const errorMessage = error.message || "Failed to fetch dataset rows";
+      
+      res.status(statusCode).json({ 
+        error: errorMessage,
+        ...(error.responseData && { responseData: error.responseData }),
+        ...(process.env.NODE_ENV === 'development' && { stack: error.stack })
+      });
     }
   });
 

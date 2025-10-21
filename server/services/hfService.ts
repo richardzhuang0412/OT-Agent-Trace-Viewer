@@ -34,6 +34,8 @@ export class HfService {
     length: number = 100
   ): Promise<HfDatasetRowsResponse> {
     try {
+      console.log(`Fetching dataset rows from HuggingFace: ${dataset}, config: ${config}, split: ${split}`);
+      
       const response = await axios.get(`${this.apiUrl}/rows`, {
         params: {
           dataset,
@@ -42,20 +44,48 @@ export class HfService {
           offset,
           length,
         },
+        timeout: 60000, // 60 second timeout
       });
       
+      console.log(`Successfully fetched ${response.data.rows?.length || 0} rows from HuggingFace`);
       return response.data;
-    } catch (error) {
-      console.error('Error fetching dataset rows:', error);
-      throw new Error('Failed to fetch dataset rows');
+    } catch (error: any) {
+      console.error('Error fetching dataset rows from HuggingFace:');
+      console.error('URL:', `${this.apiUrl}/rows`);
+      console.error('Params:', { dataset, config, split, offset, length });
+      
+      if (error.response) {
+        console.error('Response status:', error.response.status);
+        console.error('Response data:', error.response.data);
+        
+        // Preserve the status code by re-throwing the axios error
+        const hfError: any = new Error(`Failed to fetch dataset rows from HuggingFace`);
+        hfError.statusCode = error.response.status;
+        hfError.responseData = error.response.data;
+        throw hfError;
+      } else if (error.request) {
+        console.error('No response received:', error.message);
+        const hfError: any = new Error(`No response from HuggingFace server`);
+        hfError.statusCode = 503;
+        throw hfError;
+      } else {
+        console.error('Error:', error.message);
+        throw error;
+      }
     }
   }
 
   async extractTarFromUrl(tarUrl: string): Promise<TarFileContent[]> {
     try {
+      console.log('Extracting tar from URL:', tarUrl);
+      
       const response = await axios.get(tarUrl, {
         responseType: 'arraybuffer',
+        timeout: 120000, // 2 minute timeout for large tar files
+        maxContentLength: 100 * 1024 * 1024, // 100MB max
       });
+
+      console.log('Tar file downloaded, size:', response.data.byteLength, 'bytes');
 
       const files: TarFileContent[] = [];
       const buffer = Buffer.from(response.data);
@@ -86,10 +116,27 @@ export class HfService {
           .on('error', reject);
       });
 
+      console.log('Tar extraction complete, extracted', files.length, 'files');
       return files;
-    } catch (error) {
-      console.error('Error extracting tar:', error);
-      throw new Error('Failed to extract tar file');
+    } catch (error: any) {
+      console.error('Error extracting tar from URL:', tarUrl);
+      
+      if (error.response) {
+        console.error('Response status:', error.response.status);
+        console.error('Response headers:', error.response.headers);
+        
+        const tarError: any = new Error(`Failed to download tar file from URL`);
+        tarError.statusCode = error.response.status;
+        throw tarError;
+      } else if (error.request) {
+        console.error('No response received:', error.message);
+        const tarError: any = new Error(`No response from tar file server`);
+        tarError.statusCode = 503;
+        throw tarError;
+      } else {
+        console.error('Error:', error.message);
+        throw error;
+      }
     }
   }
 
