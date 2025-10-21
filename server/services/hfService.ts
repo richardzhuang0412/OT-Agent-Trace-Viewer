@@ -148,12 +148,25 @@ ${contentsForAnalysis}
 
 IMPORTANT: For each type of error or issue you identify, count how many times it occurs across all the files. Group similar errors together and provide the total count.
 
+Classify each error into one of the following categories:
+- Agent called a function incorrectly
+- Agent produced malformed JSON
+- Agent made a factual or computational error
+- Agent exceeded context window
+- Agent misunderstood task instructions or that it was a terminal agent
+- Agent misused a shell tool
+- Agent did not confirm task completion when prompted
+- Agent exhausted disk space
+- Agent hallucinated solutions or attempted to cheat (this includes mocking files that needed to be real or pretending to have solved the problem)
+- Non-agent system failure (exhausted memory, exhausted disk space, bad environment, external kill signal, et cetera)
+- Any other agent-caused error
+
 Provide your analysis in JSON format with the following structure:
 {
   "analysis": "Overall analysis of the test run",
   "failures": [
     {
-      "issue": "Brief description of the issue",
+      "issue": "One of the error categories listed above",
       "severity": "low|medium|high|critical",
       "explanation": "Detailed explanation of what went wrong",
       "count": <number of times this error occurred>
