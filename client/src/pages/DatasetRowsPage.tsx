@@ -243,33 +243,37 @@ export default function DatasetRowsPage() {
             )}
 
             {tarContents && (
-              <Card className="bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800">
-                <CardHeader>
-                  <CardTitle className="text-foreground dark:text-white flex items-center gap-2">
-                    <FileArchive className="h-5 w-5" />
-                    Tar Contents ({tarContents.length} files)
-                  </CardTitle>
-                  <div className="flex gap-2 mt-2">
-                    <Button
-                      onClick={handleRunJudge}
-                      disabled={judgeMutation.isPending}
-                      data-testid="button-run-judge"
-                    >
-                      {judgeMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                      Run LM Judge
-                    </Button>
-                    {judgeResult && (
-                      <Button
-                        onClick={() => setIsJudgeModalOpen(true)}
-                        variant="outline"
-                        data-testid="button-view-results"
-                      >
-                        View Results
-                      </Button>
-                    )}
-                  </div>
-                </CardHeader>
-                <CardContent>
+              <>
+                <Button
+                  onClick={handleRunJudge}
+                  disabled={judgeMutation.isPending}
+                  className="w-full"
+                  size="lg"
+                  data-testid="button-run-judge"
+                >
+                  {judgeMutation.isPending && <Loader2 className="h-5 w-5 mr-2 animate-spin" />}
+                  Run LM Judge
+                </Button>
+                {judgeResult && (
+                  <Button
+                    onClick={() => setIsJudgeModalOpen(true)}
+                    variant="outline"
+                    size="lg"
+                    className="w-full"
+                    data-testid="button-view-results"
+                  >
+                    View Results
+                  </Button>
+                )}
+                
+                <Card className="bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800">
+                  <CardHeader>
+                    <CardTitle className="text-foreground dark:text-white flex items-center gap-2">
+                      <FileArchive className="h-5 w-5" />
+                      Tar Contents ({tarContents.length} files)
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
                   {tarContents.length > filesPerPage && (
                     <div className="mb-4 flex items-center justify-between">
                       <Button
@@ -345,8 +349,9 @@ export default function DatasetRowsPage() {
                       </Button>
                     </div>
                   )}
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
+              </>
             )}
           </div>
 
