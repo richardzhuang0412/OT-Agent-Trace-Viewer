@@ -124,7 +124,7 @@ export const lmJudgeResultSchema = z.object({
     config: z.record(z.any()).nullable().optional(),
     result: z.record(z.any()).nullable().optional(),
     exception: z.string().nullable().optional(),
-  }),
+  }).nullable(),
   errorCounts: z.object({
     functionCallError: z.number(),
     malformedJson: z.number(),
