@@ -142,6 +142,30 @@ export class HfService {
       const resultFile = tarContents.find(f => f.path.endsWith('result.json'));
       const exceptionFile = tarContents.find(f => f.path.endsWith('exception.txt'));
 
+      let configData = null;
+      let resultData = null;
+      let exceptionData = null;
+
+      if (configFile?.content) {
+        try {
+          configData = JSON.parse(configFile.content);
+        } catch (e) {
+          console.error('Failed to parse config.json:', e);
+        }
+      }
+
+      if (resultFile?.content) {
+        try {
+          resultData = JSON.parse(resultFile.content);
+        } catch (e) {
+          console.error('Failed to parse result.json:', e);
+        }
+      }
+
+      if (exceptionFile?.content) {
+        exceptionData = exceptionFile.content;
+      }
+
       const contentsForAnalysis = tarContents
         .filter(f => f.content)
         .map(f => `File: ${f.path}\nType: ${f.type}\nSize: ${f.size}\n\nContent:\n${f.content?.substring(0, 5000)}`)
@@ -149,7 +173,23 @@ export class HfService {
 
       const prompt = `You are an expert test analyzer. Analyze the following extracted tar file contents from a test run and count how many times each type of error occurred.
 
+FILES CONTENT:
 ${contentsForAnalysis}
+
+KEY FILES EXTRACTED:
+- Config: ${configData ? JSON.stringify(configData, null, 2) : 'Not found'}
+- Result: ${resultData ? JSON.stringify(resultData, null, 2) : 'Not found'}
+- Exception: ${exceptionData || 'Not found'}
+
+INSTRUCTIONS:
+1. First, examine config.json to understand what task/path was being tested and what agent was used
+2. Look at result.json to see the outcome of the run
+3. Read exception.txt if available to identify errors
+4. Count how many times each error category occurs across ALL files
+5. Create a summary that includes:
+   - The task path from config.json (if available)
+   - The agent details from config.json (if available)
+   - A brief description of what happened in the run
 
 IMPORTANT: Count how many times each error category occurs. Return a count for ALL categories below, even if the count is 0.
 
@@ -169,9 +209,9 @@ Error categories:
 Provide your analysis in JSON format with the following structure:
 {
   "runDetails": {
-    "config": <parsed config.json if available, otherwise null>,
-    "result": <parsed result.json if available, otherwise null>,
-    "exception": <exception.txt content if available, otherwise null>
+    "config": ${configData ? JSON.stringify(configData) : 'null'},
+    "result": ${resultData ? JSON.stringify(resultData) : 'null'},
+    "exception": ${exceptionData ? JSON.stringify(exceptionData) : 'null'}
   },
   "errorCounts": {
     "functionCallError": <count>,
@@ -186,7 +226,7 @@ Provide your analysis in JSON format with the following structure:
     "systemFailure": <count>,
     "otherAgentError": <count>
   },
-  "summary": "Brief summary of findings"
+  "summary": "<Summary that includes the task path and agent from config.json, plus brief description of the run outcome>"
 }`;
 
       const response = await openai.chat.completions.create({
@@ -222,10 +262,33 @@ Provide your analysis in JSON format with the following structure:
         otherAgentError: typeof rawResult.errorCounts?.otherAgentError === 'number' ? rawResult.errorCounts.otherAgentError : 0,
       };
       
+      // Generate summary from config data if available
+      let summary = rawResult.summary || '';
+      if (!summary && configData) {
+        const taskPath = (configData as any).task_path || (configData as any).path || 'Unknown task';
+        const agent = (configData as any).agent || (configData as any).model || 'Unknown agent';
+        summary = `Task: ${taskPath} | Agent: ${agent}`;
+        
+        if (resultData) {
+          const success = (resultData as any).success ?? (resultData as any).passed;
+          if (success !== undefined && success !== null) {
+            summary += ` | Result: ${success ? 'Success' : 'Failed'}`;
+          }
+        }
+      }
+      
+      if (!summary) {
+        summary = 'No summary available';
+      }
+      
       const result = {
-        runDetails: rawResult.runDetails || {},
+        runDetails: {
+          config: configData,
+          result: resultData,
+          exception: exceptionData,
+        },
         errorCounts,
-        summary: rawResult.summary || 'No summary available',
+        summary,
       };
 
       // Validate the result against the schema
