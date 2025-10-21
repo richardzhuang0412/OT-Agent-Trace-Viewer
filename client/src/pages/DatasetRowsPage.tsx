@@ -18,7 +18,10 @@ export default function DatasetRowsPage() {
   const [selectedRow, setSelectedRow] = useState<number | null>(null);
   const [tarContents, setTarContents] = useState<TarFileContent[] | null>(null);
   const [judgeResult, setJudgeResult] = useState<LmJudgeResult | null>(null);
+  const [currentPage, setCurrentPage] = useState(0);
   const { toast } = useToast();
+  
+  const filesPerPage = 100;
 
   const { data: rowsData, isLoading, error: rowsError } = useQuery<HfDatasetRowsResponse>({
     queryKey: ['/api/hf/rows', datasetId],
@@ -105,6 +108,7 @@ export default function DatasetRowsPage() {
     setSelectedRow(rowIdx);
     setTarContents(null);
     setJudgeResult(null);
+    setCurrentPage(0);
     
     // Check if row contains tar file before extracting
     const hasTarFile = Object.values(rowData).some((value) => 
@@ -127,6 +131,14 @@ export default function DatasetRowsPage() {
     if (tarContents) {
       judgeMutation.mutate(tarContents);
     }
+  };
+
+  const handleNextPage = () => {
+    setCurrentPage(prev => prev + 1);
+  };
+
+  const handlePrevPage = () => {
+    setCurrentPage(prev => Math.max(0, prev - 1));
   };
 
   const getSeverityColor = (severity: string) => {
@@ -240,31 +252,57 @@ export default function DatasetRowsPage() {
                 </CardHeader>
                 <CardContent>
                   <Accordion type="single" collapsible className="w-full">
-                    {tarContents.map((file, idx) => (
-                      <AccordionItem key={idx} value={`file-${idx}`}>
-                        <AccordionTrigger className="text-sm text-foreground dark:text-white">
-                          <div className="flex items-center gap-2">
-                            <Badge variant="secondary" className="text-xs">
-                              {file.type}
-                            </Badge>
-                            <span className="truncate">{file.path}</span>
-                          </div>
-                        </AccordionTrigger>
-                        <AccordionContent>
-                          <div className="text-xs space-y-2">
-                            <div className="text-muted-foreground dark:text-gray-400">
-                              Size: {file.size} bytes
+                    {tarContents.slice(currentPage * filesPerPage, (currentPage + 1) * filesPerPage).map((file, idx) => {
+                      const actualIdx = currentPage * filesPerPage + idx;
+                      return (
+                        <AccordionItem key={actualIdx} value={`file-${actualIdx}`}>
+                          <AccordionTrigger className="text-sm text-foreground dark:text-white">
+                            <div className="flex items-center gap-2">
+                              <Badge variant="secondary" className="text-xs">
+                                {file.type}
+                              </Badge>
+                              <span className="truncate">{file.path}</span>
                             </div>
-                            {file.content && (
-                              <pre className="bg-muted dark:bg-gray-800 p-3 rounded-md overflow-auto max-h-64 text-foreground dark:text-white">
-                                {file.content}
-                              </pre>
-                            )}
-                          </div>
-                        </AccordionContent>
-                      </AccordionItem>
-                    ))}
+                          </AccordionTrigger>
+                          <AccordionContent>
+                            <div className="text-xs space-y-2">
+                              <div className="text-muted-foreground dark:text-gray-400">
+                                Size: {file.size} bytes
+                              </div>
+                              {file.content && (
+                                <pre className="bg-muted dark:bg-gray-800 p-3 rounded-md overflow-auto max-h-64 text-foreground dark:text-white">
+                                  {file.content}
+                                </pre>
+                              )}
+                            </div>
+                          </AccordionContent>
+                        </AccordionItem>
+                      );
+                    })}
                   </Accordion>
+                  {tarContents.length > filesPerPage && (
+                    <div className="mt-4 flex items-center justify-between">
+                      <Button
+                        onClick={handlePrevPage}
+                        variant="outline"
+                        disabled={currentPage === 0}
+                        data-testid="button-prev-page"
+                      >
+                        Previous
+                      </Button>
+                      <span className="text-sm text-muted-foreground dark:text-gray-400">
+                        Showing {currentPage * filesPerPage + 1}-{Math.min((currentPage + 1) * filesPerPage, tarContents.length)} of {tarContents.length} files
+                      </span>
+                      <Button
+                        onClick={handleNextPage}
+                        variant="outline"
+                        disabled={(currentPage + 1) * filesPerPage >= tarContents.length}
+                        data-testid="button-next-page"
+                      >
+                        Next
+                      </Button>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             )}
