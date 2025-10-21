@@ -189,7 +189,7 @@ export default function DatasetRowsPage() {
           <p className="text-muted-foreground dark:text-gray-400">{datasetId}</p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="space-y-6">
           <Card className="bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800">
             <CardHeader>
               <CardTitle className="text-foreground dark:text-white">Dataset Rows</CardTitle>
@@ -270,6 +270,29 @@ export default function DatasetRowsPage() {
                   </div>
                 </CardHeader>
                 <CardContent>
+                  {tarContents.length > filesPerPage && (
+                    <div className="mb-4 flex items-center justify-between">
+                      <Button
+                        onClick={handlePrevPage}
+                        variant="outline"
+                        disabled={currentPage === 0}
+                        data-testid="button-prev-page-top"
+                      >
+                        Previous
+                      </Button>
+                      <span className="text-sm text-muted-foreground dark:text-gray-400">
+                        Showing {currentPage * filesPerPage + 1}-{Math.min((currentPage + 1) * filesPerPage, tarContents.length)} of {tarContents.length} files
+                      </span>
+                      <Button
+                        onClick={handleNextPage}
+                        variant="outline"
+                        disabled={(currentPage + 1) * filesPerPage >= tarContents.length}
+                        data-testid="button-next-page-top"
+                      >
+                        Next
+                      </Button>
+                    </div>
+                  )}
                   <Accordion type="single" collapsible className="w-full">
                     {tarContents.slice(currentPage * filesPerPage, (currentPage + 1) * filesPerPage).map((file, idx) => {
                       const actualIdx = currentPage * filesPerPage + idx;
@@ -325,8 +348,9 @@ export default function DatasetRowsPage() {
                 </CardContent>
               </Card>
             )}
+          </div>
 
-            <Dialog open={isJudgeModalOpen} onOpenChange={setIsJudgeModalOpen}>
+          <Dialog open={isJudgeModalOpen} onOpenChange={setIsJudgeModalOpen}>
               <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto bg-white dark:bg-gray-900">
                 <DialogHeader>
                   <DialogTitle className="text-foreground dark:text-white flex items-center gap-2">
@@ -385,7 +409,6 @@ export default function DatasetRowsPage() {
                 )}
               </DialogContent>
             </Dialog>
-          </div>
         </div>
       </div>
     </div>
