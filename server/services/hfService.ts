@@ -3,6 +3,7 @@ import * as tar from 'tar';
 import { Readable } from 'stream';
 import OpenAI from 'openai';
 import type { HfDataset, HfDatasetRowsResponse, TarFileContent, LmJudgeResult } from '@shared/schema';
+import { lmJudgeResultSchema } from '@shared/schema';
 
 export class HfService {
   private baseUrl = 'https://huggingface.co';
@@ -145,6 +146,8 @@ export class HfService {
 
 ${contentsForAnalysis}
 
+IMPORTANT: For each type of error or issue you identify, count how many times it occurs across all the files. Group similar errors together and provide the total count.
+
 Provide your analysis in JSON format with the following structure:
 {
   "analysis": "Overall analysis of the test run",
@@ -152,7 +155,8 @@ Provide your analysis in JSON format with the following structure:
     {
       "issue": "Brief description of the issue",
       "severity": "low|medium|high|critical",
-      "explanation": "Detailed explanation of what went wrong"
+      "explanation": "Detailed explanation of what went wrong",
+      "count": <number of times this error occurred>
     }
   ],
   "summary": "Brief summary of findings"
@@ -174,13 +178,27 @@ Provide your analysis in JSON format with the following structure:
         max_completion_tokens: 4096,
       });
 
-      const result = JSON.parse(response.choices[0].message.content || '{}');
+      const rawResult = JSON.parse(response.choices[0].message.content || '{}');
       
-      return {
-        analysis: result.analysis || 'No analysis available',
-        failures: result.failures || [],
-        summary: result.summary || 'No summary available',
+      // Ensure all failures have a count field, defaulting to 1 if missing
+      const failures = (rawResult.failures || []).map((failure: any) => ({
+        issue: failure.issue || 'Unknown issue',
+        severity: ['low', 'medium', 'high', 'critical'].includes(failure.severity) 
+          ? failure.severity 
+          : 'medium',
+        explanation: failure.explanation || 'No explanation provided',
+        count: typeof failure.count === 'number' && failure.count > 0 ? failure.count : 1,
+      }));
+      
+      const result = {
+        analysis: rawResult.analysis || 'No analysis available',
+        failures,
+        summary: rawResult.summary || 'No summary available',
       };
+
+      // Validate the result against the schema
+      const validated = lmJudgeResultSchema.parse(result);
+      return validated;
     } catch (error) {
       console.error('Error running LM judge:', error);
       throw new Error('Failed to run LM judge analysis');

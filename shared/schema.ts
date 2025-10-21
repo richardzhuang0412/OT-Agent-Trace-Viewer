@@ -125,6 +125,7 @@ export const lmJudgeResultSchema = z.object({
     issue: z.string(),
     severity: z.enum(['low', 'medium', 'high', 'critical']),
     explanation: z.string(),
+    count: z.number(),
   })),
   summary: z.string(),
 });

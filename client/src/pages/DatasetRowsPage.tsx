@@ -394,10 +394,13 @@ export default function DatasetRowsPage() {
                                   <AlertCircle className="h-5 w-5 text-amber-500 mt-0.5" />
                                 )}
                                 <div className="flex-1">
-                                  <div className="flex items-center gap-2 mb-1">
+                                  <div className="flex items-center gap-2 mb-1 flex-wrap">
                                     <span className="font-medium text-white">{failure.issue}</span>
                                     <Badge className={getSeverityColor(failure.severity)}>
                                       {failure.severity}
+                                    </Badge>
+                                    <Badge variant="outline" className="bg-gray-800 text-gray-300 border-gray-600">
+                                      Count: {failure.count}
                                     </Badge>
                                   </div>
                                   <p className="text-sm text-gray-400">
