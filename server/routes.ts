@@ -176,8 +176,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         parseInt(length as string) || 100
       );
       
-      console.log('[Route /api/hf/rows] Successfully returning', rows.rows?.length || 0, 'rows');
+      console.log('[Route /api/hf/rows] Successfully fetched', rows.rows?.length || 0, 'rows');
+      
+      // Check response size
+      const responseSize = JSON.stringify(rows).length;
+      console.log('[Route /api/hf/rows] Response size:', responseSize, 'bytes (', (responseSize / 1024 / 1024).toFixed(2), 'MB)');
+      
+      if (responseSize > 5 * 1024 * 1024) {
+        console.warn('[Route /api/hf/rows] WARNING: Response is larger than 5MB, this might cause issues');
+      }
+      
+      console.log('[Route /api/hf/rows] Sending response to client...');
       res.json(rows);
+      console.log('[Route /api/hf/rows] Response sent successfully');
     } catch (error: any) {
       console.error('[Route /api/hf/rows] ===== ERROR CAUGHT IN ROUTE =====');
       console.error('[Route /api/hf/rows] Error name:', error.name);
