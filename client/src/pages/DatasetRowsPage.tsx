@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useRoute, Link } from 'wouter';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -22,6 +22,7 @@ export default function DatasetRowsPage() {
   const [currentPage, setCurrentPage] = useState(0);
   const [isJudgeModalOpen, setIsJudgeModalOpen] = useState(false);
   const { toast } = useToast();
+  const tarSectionRef = useRef<HTMLDivElement>(null);
   
   const filesPerPage = 100;
 
@@ -127,6 +128,11 @@ export default function DatasetRowsPage() {
       return;
     }
     
+    // Scroll to tar section with smooth animation
+    setTimeout(() => {
+      tarSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
+    
     extractTarMutation.mutate(rowData);
   };
 
@@ -224,7 +230,7 @@ export default function DatasetRowsPage() {
             </CardContent>
           </Card>
 
-          <div className="space-y-6">
+          <div ref={tarSectionRef} className="space-y-6">
             {extractTarMutation.isPending && (
               <Card className="bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800">
                 <CardContent className="pt-6">
