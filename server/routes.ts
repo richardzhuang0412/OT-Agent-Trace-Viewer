@@ -239,8 +239,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const result = await hfService.runLmJudge(files);
       res.json(result);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error running LM judge:", error);
+      
+      // Handle OpenAI quota errors specifically
+      if (error.status === 429 || error.code === 'insufficient_quota') {
+        return res.status(429).json({ 
+          error: "OpenAI API quota exceeded. Please check your OpenAI account billing and usage limits.",
+          details: "You have exceeded your current OpenAI API quota."
+        });
+      }
+      
+      // Handle other OpenAI API errors
+      if (error.status && error.message) {
+        return res.status(error.status).json({ 
+          error: error.message 
+        });
+      }
+      
       res.status(500).json({ error: "Failed to run LM judge analysis" });
     }
   });
