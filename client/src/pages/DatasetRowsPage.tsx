@@ -425,6 +425,25 @@ export default function DatasetRowsPage() {
 
                     <div>
                       <h4 className="font-semibold mb-3 text-white">Error Counts</h4>
+                      
+                      {(() => {
+                        const totalErrors = Object.values(judgeResult.errorCounts).reduce((sum, count) => sum + count, 0);
+                        return (
+                          <div className="mb-4 p-4 bg-gray-900 border border-gray-700 rounded-lg">
+                            <div className="flex items-center justify-between">
+                              <span className="text-gray-300 font-medium">Total Failures</span>
+                              <Badge 
+                                variant="default"
+                                className={`text-lg px-4 py-1 ${totalErrors > 0 ? 'bg-red-600 text-white' : 'bg-green-600 text-white'}`}
+                                data-testid="badge-total-errors"
+                              >
+                                {totalErrors}
+                              </Badge>
+                            </div>
+                          </div>
+                        );
+                      })()}
+                      
                       <div className="border border-gray-700 rounded-lg overflow-hidden">
                         <Table>
                           <TableHeader>
