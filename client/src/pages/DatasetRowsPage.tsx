@@ -221,12 +221,21 @@ export default function DatasetRowsPage() {
                     {rowsData?.rows.map((row) => (
                       <TableRow
                         key={row.row_idx}
-                        className={`cursor-pointer ${selectedRow === row.row_idx ? 'bg-primary/10' : ''}`}
+                        className={`cursor-pointer transition-colors ${
+                          selectedRow === row.row_idx 
+                            ? 'bg-primary/20 dark:bg-primary/30 border-l-4 border-primary' 
+                            : 'hover:bg-muted/50 dark:hover:bg-gray-800/50'
+                        }`}
                         onClick={() => handleRowClick(row.row_idx, row.row)}
                         data-testid={`row-dataset-${row.row_idx}`}
                       >
                         <TableCell className="font-medium text-foreground dark:text-white">
-                          {row.row_idx}
+                          <div className="flex items-center gap-2">
+                            {selectedRow === row.row_idx && extractTarMutation.isPending && (
+                              <Loader2 className="h-4 w-4 animate-spin text-primary" data-testid="loader-row-loading" />
+                            )}
+                            {row.row_idx}
+                          </div>
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground dark:text-gray-400">
                           <div className="max-w-md truncate">
