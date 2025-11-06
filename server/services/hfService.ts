@@ -229,10 +229,10 @@ export class HfService {
 
       const contentsForAnalysis = tarContents
         .filter(f => f.content)
-        .map(f => `File: ${f.path}\nType: ${f.type}\nSize: ${f.size}\n\nContent:\n${f.content?.substring(0, 5000)}`)
+        .map(f => `File: ${f.path}\nType: ${f.type}\nSize: ${f.size}\n\nContent:\n${f.content?.substring(0, 20000)}`)
         .join('\n\n---\n\n');
 
-      const prompt = `You are an expert test analyzer. Analyze the following extracted tar file contents from a test run and count how many times each type of error occurred.
+      const prompt = `You are an expert test analyzer. Analyze the following extracted tar file contents from a test run and identify ALL errors that occurred.
 
 FILES CONTENT:
 ${contentsForAnalysis}
@@ -242,31 +242,74 @@ KEY FILES EXTRACTED:
 - Result: ${resultData ? JSON.stringify(resultData, null, 2) : 'Not found'}
 - Exception: ${exceptionData || 'Not found'}
 
-INSTRUCTIONS:
-1. First, examine config.json to understand the dataset link and agent being used
-2. Look at result.json to see the outcome of the run
-3. Read exception.txt if available to identify errors
-4. Count how many times each error category occurs across ALL files
-5. Create a brief summary that includes ONLY:
-   - The dataset link from config.json (if available)
-   - The agent details from config.json (if available)
+ANALYSIS STEPS:
+1. Check result.json for the "resolved" field - if false, there was a failure
+2. Read exception.txt for error messages, stack traces, and failure indicators
+3. Search ALL files for error patterns like "Error:", "Exception:", "Failed", "Traceback", exit codes, etc.
+4. Look for specific error indicators in logs and traces
 
-IMPORTANT: Count how many times each error category occurs. Return a count for ALL categories below, even if the count is 0.
+ERROR DETECTION RULES (look for these specific patterns):
 
-Error categories:
-1. functionCallError - Agent called a function incorrectly
-2. malformedJson - Agent produced malformed JSON
-3. factualComputationalError - Agent made a factual or computational error
-4. exceededContextWindow - Agent exceeded context window
-5. misunderstoodInstructions - Agent misunderstood task instructions or that it was a terminal agent
-6. shellToolMisuse - Agent misused a shell tool
-7. noTaskConfirmation - Agent did not confirm task completion when prompted
-8. exhaustedDiskSpace - Agent exhausted disk space
-9. hallucinatedSolutions - Agent hallucinated solutions or attempted to cheat (this includes mocking files that needed to be real or pretending to have solved the problem)
-10. systemFailure - Non-agent system failure (exhausted memory, exhausted disk space, bad environment, external kill signal, et cetera)
-11. otherAgentError - Any other agent-caused error
+1. functionCallError - Count if you find:
+   - "invalid arguments", "missing required parameter", "function not found"
+   - TypeError, AttributeError related to function calls
+   - Wrong number of arguments passed to functions
 
-Provide your analysis in JSON format with the following structure (DO NOT include any JSON objects or config details):
+2. malformedJson - Count if you find:
+   - "JSON parse error", "invalid JSON", "Expecting property name"
+   - SyntaxError in JSON parsing
+   - Unterminated strings or objects in JSON
+
+3. factualComputationalError - Count if you find:
+   - Incorrect calculations, wrong results, logic errors
+   - Assertions failed, test failures, wrong outputs
+   - Mathematical or logical mistakes
+
+4. exceededContextWindow - Count if you find:
+   - "context length exceeded", "maximum context", "token limit"
+   - 400/413 errors related to input size
+
+5. misunderstoodInstructions - Count if you find:
+   - Agent did wrong task, ignored requirements
+   - "task not completed", wrong interpretation
+   - Agent stopped before finishing
+
+6. shellToolMisuse - Count if you find:
+   - Command not found, bash errors, invalid shell commands
+   - "permission denied", syntax errors in bash
+   - Incorrect use of shell tools
+
+7. noTaskConfirmation - Count if you find:
+   - Agent didn't respond when asked if task is complete
+   - Missing confirmation messages
+
+8. exhaustedDiskSpace - Count if you find:
+   - "No space left on device", "disk full", "out of space"
+   - ENOSPC errors
+
+9. hallucinatedSolutions - Count if you find:
+   - Mock/fake implementations instead of real solutions
+   - Hardcoded test data, placeholder values
+   - Comments like "TODO", "mock", "fake", "placeholder"
+   - Agent claiming completion without actual work
+
+10. systemFailure - Count if you find:
+   - Out of memory, killed by system, segmentation fault
+   - External process termination, timeout
+   - Infrastructure/environment failures
+
+11. otherAgentError - Count if you find:
+   - Any other agent-related errors not covered above
+   - Unexpected exceptions, runtime errors
+
+IMPORTANT INSTRUCTIONS:
+- Be thorough: scan exception.txt and ALL log files for error patterns
+- Each occurrence of an error pattern = count of 1 (don't double-count the same error)
+- If result.json shows resolved=false but you can't find specific errors, count as otherAgentError
+- If you see multiple different errors, count each one
+- Return 0 for categories where no errors are found
+
+Provide your analysis in JSON format:
 {
   "errorCounts": {
     "functionCallError": <count>,
@@ -281,7 +324,7 @@ Provide your analysis in JSON format with the following structure (DO NOT includ
     "systemFailure": <count>,
     "otherAgentError": <count>
   },
-  "summary": "<Brief summary with ONLY dataset link and agent details - no JSON objects or full config details>"
+  "summary": "<Brief summary with dataset link and agent details from config.json>"
 }`;
 
       const response = await openai.chat.completions.create({
