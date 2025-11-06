@@ -23,6 +23,7 @@ export default function DatasetRowsPage() {
   const [isJudgeModalOpen, setIsJudgeModalOpen] = useState(false);
   const [isBulkJudgeModalOpen, setIsBulkJudgeModalOpen] = useState(false);
   const [bulkJudgeResult, setBulkJudgeResult] = useState<LmJudgeResult | null>(null);
+  const [bulkJudgeBatchOffset, setBulkJudgeBatchOffset] = useState(0);
   const [allRows, setAllRows] = useState<any[]>([]);
   const [rowsOffset, setRowsOffset] = useState(0);
   const [totalRows, setTotalRows] = useState(0);
@@ -33,6 +34,7 @@ export default function DatasetRowsPage() {
   
   const filesPerPage = 100;
   const rowsPerPage = 100;
+  const bulkJudgeBatchSize = 500;
 
   const { data: rowsData, isLoading, error: rowsError, refetch: refetchRows } = useQuery<HfDatasetRowsResponse>({
     queryKey: ['/api/hf/rows', datasetId, rowsOffset],
@@ -207,6 +209,76 @@ export default function DatasetRowsPage() {
     }
   };
 
+  const handleRunBulkJudge = async () => {
+    try {
+      const batchSize = 100;
+      const rowsToFetch: any[] = [];
+      const startRow = bulkJudgeBatchOffset;
+      const endRow = Math.min(bulkJudgeBatchOffset + bulkJudgeBatchSize, totalRows);
+      
+      toast({
+        title: 'Fetching rows',
+        description: `Fetching rows ${startRow}-${endRow} for analysis...`,
+      });
+
+      // Fetch rows in batches of 100 up to 500 total from the current offset
+      for (let offset = bulkJudgeBatchOffset; offset < bulkJudgeBatchOffset + bulkJudgeBatchSize && offset < totalRows; offset += batchSize) {
+        const response = await fetch(
+          `/api/hf/rows?dataset=${encodeURIComponent(datasetId)}&offset=${offset}&length=${batchSize}`
+        );
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch rows');
+        }
+        
+        const data = await response.json();
+        
+        if (data.rows && data.rows.length > 0) {
+          rowsToFetch.push(...data.rows);
+        }
+        
+        // Stop if we got fewer rows than requested (reached end of dataset)
+        if (!data.rows || data.rows.length < batchSize) {
+          break;
+        }
+      }
+
+      if (rowsToFetch.length === 0) {
+        toast({
+          title: 'No rows found',
+          description: 'No rows available for analysis in this batch',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      toast({
+        title: 'Running analysis',
+        description: `Analyzing ${rowsToFetch.length} rows (${startRow}-${startRow + rowsToFetch.length - 1}) with LM judge...`,
+      });
+
+      bulkJudgeMutation.mutate(rowsToFetch);
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to fetch rows for bulk analysis',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleNextBulkBatch = () => {
+    const newOffset = bulkJudgeBatchOffset + bulkJudgeBatchSize;
+    if (newOffset < totalRows) {
+      setBulkJudgeBatchOffset(newOffset);
+    }
+  };
+
+  const handlePrevBulkBatch = () => {
+    const newOffset = Math.max(0, bulkJudgeBatchOffset - bulkJudgeBatchSize);
+    setBulkJudgeBatchOffset(newOffset);
+  };
+
   // Infinite scroll handler
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const target = e.currentTarget;
@@ -277,22 +349,56 @@ export default function DatasetRowsPage() {
         <div className="space-y-6">
           <Card className="bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800">
             <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-foreground dark:text-white">Dataset Rows</CardTitle>
-                  <p className="text-sm text-muted-foreground dark:text-gray-400">
-                    Showing {allRows.length} of {totalRows} rows
-                  </p>
+              <div className="flex flex-col gap-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-foreground dark:text-white">Dataset Rows</CardTitle>
+                    <p className="text-sm text-muted-foreground dark:text-gray-400">
+                      Showing {allRows.length} of {totalRows} rows
+                    </p>
+                  </div>
                 </div>
-                <Button
-                  onClick={() => bulkJudgeMutation.mutate(allRows)}
-                  disabled={bulkJudgeMutation.isPending || allRows.length === 0}
-                  data-testid="button-run-bulk-judge"
-                  variant="outline"
-                >
-                  {bulkJudgeMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                  Run LM Judge on All Rows
-                </Button>
+                
+                <div className="flex items-center justify-between border border-gray-200 dark:border-gray-700 rounded-lg p-4 bg-muted/50 dark:bg-gray-800/50">
+                  <div className="flex flex-col gap-2">
+                    <span className="text-sm font-medium text-foreground dark:text-white">
+                      Bulk LM Judge Analysis
+                    </span>
+                    <span className="text-xs text-muted-foreground dark:text-gray-400">
+                      Batch: Rows {bulkJudgeBatchOffset} - {Math.min(bulkJudgeBatchOffset + bulkJudgeBatchSize, totalRows)}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      onClick={handlePrevBulkBatch}
+                      disabled={bulkJudgeBatchOffset === 0 || bulkJudgeMutation.isPending}
+                      variant="outline"
+                      size="sm"
+                      data-testid="button-prev-bulk-batch"
+                    >
+                      Previous 500
+                    </Button>
+                    <Button
+                      onClick={handleRunBulkJudge}
+                      disabled={bulkJudgeMutation.isPending || totalRows === 0}
+                      data-testid="button-run-bulk-judge"
+                      variant="default"
+                      size="sm"
+                    >
+                      {bulkJudgeMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                      Run Judge
+                    </Button>
+                    <Button
+                      onClick={handleNextBulkBatch}
+                      disabled={bulkJudgeBatchOffset + bulkJudgeBatchSize >= totalRows || bulkJudgeMutation.isPending}
+                      variant="outline"
+                      size="sm"
+                      data-testid="button-next-bulk-batch"
+                    >
+                      Next 500
+                    </Button>
+                  </div>
+                </div>
               </div>
             </CardHeader>
             <CardContent>
