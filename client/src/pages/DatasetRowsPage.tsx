@@ -207,6 +207,13 @@ export default function DatasetRowsPage() {
     setJudgeResult(null);
     setCurrentPage(0);
     
+    // Only attempt to extract tar files if the dataset contains them
+    if (hasTarFiles === false) {
+      // For datasets without tar files (agent communications), just select the row
+      // No extraction needed
+      return;
+    }
+    
     // Check if row contains tar file before extracting
     const hasTarFile = Object.values(rowData).some((value) => 
       typeof value === 'string' && (value.includes('.tar') || value.length > 1000)
@@ -457,10 +464,10 @@ export default function DatasetRowsPage() {
                         {allRows.map((row) => (
                           <TableRow
                             key={row.row_idx}
-                            className={`cursor-pointer transition-colors ${
+                            className={`${hasTarFiles !== false ? 'cursor-pointer' : ''} transition-colors ${
                               selectedRow === row.row_idx 
                                 ? 'bg-primary/20 dark:bg-primary/30 border-l-4 border-primary' 
-                                : 'hover:bg-muted/50 dark:hover:bg-gray-800/50'
+                                : hasTarFiles !== false ? 'hover:bg-muted/50 dark:hover:bg-gray-800/50' : ''
                             }`}
                             onClick={() => handleRowClick(row.row_idx, row.row)}
                             data-testid={`row-dataset-${row.row_idx}`}
