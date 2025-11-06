@@ -27,6 +27,7 @@ export default function DatasetRowsPage() {
   const [allRows, setAllRows] = useState<any[]>([]);
   const [rowsOffset, setRowsOffset] = useState(0);
   const [totalRows, setTotalRows] = useState(0);
+  const [hasTarFiles, setHasTarFiles] = useState<boolean | null>(null);
   const { toast } = useToast();
   const tarSectionRef = useRef<HTMLDivElement>(null);
   const tableScrollRef = useRef<HTMLDivElement>(null);
@@ -64,6 +65,7 @@ export default function DatasetRowsPage() {
     setSelectedRow(null);
     setTarContents(null);
     setJudgeResult(null);
+    setHasTarFiles(null);
     lastLoadedOffsetRef.current = -1;
   }, [datasetId]);
 
@@ -93,6 +95,30 @@ export default function DatasetRowsPage() {
       });
     }
   }, [rowsError, toast]);
+
+  // Detect if dataset contains tar files by checking the first loaded rows
+  useEffect(() => {
+    if (allRows.length > 0 && hasTarFiles === null) {
+      // Check first few rows to determine if this is a tar-based dataset
+      const checkForTar = (rowData: any): boolean => {
+        for (const [key, value] of Object.entries(rowData)) {
+          if (typeof value === 'string' && value.includes('.tar')) {
+            return true;
+          }
+          // Check if it's base64 encoded tar data
+          if (typeof value === 'string' && value.length > 1000 && !value.startsWith('http')) {
+            return true;
+          }
+        }
+        return false;
+      };
+
+      // Check first 5 rows or all available rows if less than 5
+      const rowsToCheck = allRows.slice(0, Math.min(5, allRows.length));
+      const containsTar = rowsToCheck.some(row => checkForTar(row.row));
+      setHasTarFiles(containsTar);
+    }
+  }, [allRows, hasTarFiles]);
 
   const extractTarMutation = useMutation({
     mutationFn: async (rowData: any) => {
@@ -359,46 +385,49 @@ export default function DatasetRowsPage() {
                   </div>
                 </div>
                 
-                <div className="flex items-center justify-between border border-gray-200 dark:border-gray-700 rounded-lg p-4 bg-muted/50 dark:bg-gray-800/50">
-                  <div className="flex flex-col gap-2">
-                    <span className="text-sm font-medium text-foreground dark:text-white">
-                      Bulk LM Judge Analysis
-                    </span>
-                    <span className="text-xs text-muted-foreground dark:text-gray-400">
-                      Batch: Rows {bulkJudgeBatchOffset} - {Math.min(bulkJudgeBatchOffset + bulkJudgeBatchSize, totalRows)}
-                    </span>
+                {/* Only show batch controls for datasets without tar files (agent communications) */}
+                {hasTarFiles === false && (
+                  <div className="flex items-center justify-between border border-gray-200 dark:border-gray-700 rounded-lg p-4 bg-muted/50 dark:bg-gray-800/50">
+                    <div className="flex flex-col gap-2">
+                      <span className="text-sm font-medium text-foreground dark:text-white">
+                        Bulk LM Judge Analysis
+                      </span>
+                      <span className="text-xs text-muted-foreground dark:text-gray-400">
+                        Batch: Rows {bulkJudgeBatchOffset} - {Math.min(bulkJudgeBatchOffset + bulkJudgeBatchSize, totalRows)}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        onClick={handlePrevBulkBatch}
+                        disabled={bulkJudgeBatchOffset === 0 || bulkJudgeMutation.isPending}
+                        variant="outline"
+                        size="sm"
+                        data-testid="button-prev-bulk-batch"
+                      >
+                        Previous 500
+                      </Button>
+                      <Button
+                        onClick={handleRunBulkJudge}
+                        disabled={bulkJudgeMutation.isPending || totalRows === 0}
+                        data-testid="button-run-bulk-judge"
+                        variant="default"
+                        size="sm"
+                      >
+                        {bulkJudgeMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                        Run Judge
+                      </Button>
+                      <Button
+                        onClick={handleNextBulkBatch}
+                        disabled={bulkJudgeBatchOffset + bulkJudgeBatchSize >= totalRows || bulkJudgeMutation.isPending}
+                        variant="outline"
+                        size="sm"
+                        data-testid="button-next-bulk-batch"
+                      >
+                        Next 500
+                      </Button>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      onClick={handlePrevBulkBatch}
-                      disabled={bulkJudgeBatchOffset === 0 || bulkJudgeMutation.isPending}
-                      variant="outline"
-                      size="sm"
-                      data-testid="button-prev-bulk-batch"
-                    >
-                      Previous 500
-                    </Button>
-                    <Button
-                      onClick={handleRunBulkJudge}
-                      disabled={bulkJudgeMutation.isPending || totalRows === 0}
-                      data-testid="button-run-bulk-judge"
-                      variant="default"
-                      size="sm"
-                    >
-                      {bulkJudgeMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                      Run Judge
-                    </Button>
-                    <Button
-                      onClick={handleNextBulkBatch}
-                      disabled={bulkJudgeBatchOffset + bulkJudgeBatchSize >= totalRows || bulkJudgeMutation.isPending}
-                      variant="outline"
-                      size="sm"
-                      data-testid="button-next-bulk-batch"
-                    >
-                      Next 500
-                    </Button>
-                  </div>
-                </div>
+                )}
               </div>
             </CardHeader>
             <CardContent>
