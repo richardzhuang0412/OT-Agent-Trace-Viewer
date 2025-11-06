@@ -264,7 +264,7 @@ export default function DatasetRowsPage() {
             <CardContent>
               <div 
                 ref={tableScrollRef}
-                className="max-h-[600px] overflow-auto"
+                className="max-h-[400px] overflow-auto"
                 onScroll={handleScroll}
               >
                 <Table>
