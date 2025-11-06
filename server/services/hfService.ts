@@ -328,7 +328,7 @@ Provide your analysis in JSON format:
 }`;
 
       const response = await openai.chat.completions.create({
-        model: 'gpt-5',
+        model: 'gpt-5-nano',
         messages: [
           {
             role: 'system',
@@ -571,7 +571,7 @@ Provide your analysis in JSON format:
 }`;
 
       const response = await openai.chat.completions.create({
-        model: 'gpt-5',
+        model: 'gpt-5-nano',
         messages: [
           {
             role: 'system',
