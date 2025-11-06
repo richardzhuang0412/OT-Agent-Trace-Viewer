@@ -173,7 +173,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         config as string || 'default',
         split as string || 'train',
         parseInt(offset as string) || 0,
-        parseInt(length as string) || 1000  // Load up to 1000 rows at once
+        parseInt(length as string) || 100  // HuggingFace API max is 100
       );
       
       console.log('[Route /api/hf/rows] Successfully fetched', rows.rows?.length || 0, 'rows');

@@ -29,18 +29,44 @@ export default function DatasetRowsPage() {
   const { data: rowsData, isLoading, error: rowsError, refetch: refetchRows } = useQuery<HfDatasetRowsResponse>({
     queryKey: ['/api/hf/rows', datasetId],
     queryFn: async () => {
-      // Fetch all rows at once (increased limit to handle large datasets)
-      const response = await fetch(`/api/hf/rows?dataset=${encodeURIComponent(datasetId)}&length=1000`);
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
+      // Fetch first batch to get total count
+      const firstResponse = await fetch(`/api/hf/rows?dataset=${encodeURIComponent(datasetId)}&length=100&offset=0`);
+      if (!firstResponse.ok) {
+        const errorData = await firstResponse.json().catch(() => ({}));
         console.error('Failed to fetch dataset rows:', {
-          status: response.status,
-          statusText: response.statusText,
+          status: firstResponse.status,
+          statusText: firstResponse.statusText,
           errorData
         });
-        throw new Error(errorData.error || `Failed to fetch dataset rows (${response.status})`);
+        throw new Error(errorData.error || `Failed to fetch dataset rows (${firstResponse.status})`);
       }
-      return response.json();
+      const firstBatch = await firstResponse.json();
+      
+      // If there are more rows, fetch them all in parallel
+      const totalRows = firstBatch.num_rows_total || 0;
+      const allRows = [...firstBatch.rows];
+      
+      if (totalRows > 100) {
+        const numBatches = Math.ceil((totalRows - 100) / 100);
+        const fetchPromises = [];
+        
+        for (let i = 1; i <= numBatches; i++) {
+          const offset = i * 100;
+          fetchPromises.push(
+            fetch(`/api/hf/rows?dataset=${encodeURIComponent(datasetId)}&length=100&offset=${offset}`)
+              .then(res => res.json())
+              .then(data => data.rows)
+          );
+        }
+        
+        const additionalBatches = await Promise.all(fetchPromises);
+        additionalBatches.forEach(batch => allRows.push(...batch));
+      }
+      
+      return {
+        ...firstBatch,
+        rows: allRows
+      };
     },
     enabled: !!datasetId,
   });
