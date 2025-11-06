@@ -21,6 +21,8 @@ export default function DatasetRowsPage() {
   const [judgeResult, setJudgeResult] = useState<LmJudgeResult | null>(null);
   const [currentPage, setCurrentPage] = useState(0);
   const [isJudgeModalOpen, setIsJudgeModalOpen] = useState(false);
+  const [isBulkJudgeModalOpen, setIsBulkJudgeModalOpen] = useState(false);
+  const [bulkJudgeResult, setBulkJudgeResult] = useState<LmJudgeResult | null>(null);
   const [allRows, setAllRows] = useState<any[]>([]);
   const [rowsOffset, setRowsOffset] = useState(0);
   const [totalRows, setTotalRows] = useState(0);
@@ -149,6 +151,28 @@ export default function DatasetRowsPage() {
     },
   });
 
+  const bulkJudgeMutation = useMutation({
+    mutationFn: async (rows: any[]) => {
+      const response = await apiRequest('POST', '/api/hf/judge-all-rows', { rows });
+      return await response.json();
+    },
+    onSuccess: (data: LmJudgeResult) => {
+      setBulkJudgeResult(data);
+      setIsBulkJudgeModalOpen(true);
+      toast({
+        title: 'Bulk Analysis Complete',
+        description: 'LM judge has analyzed all dataset rows',
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to run bulk LM judge',
+        variant: 'destructive',
+      });
+    },
+  });
+
   const handleRowClick = async (rowIdx: number, rowData: any) => {
     setSelectedRow(rowIdx);
     setTarContents(null);
@@ -253,10 +277,23 @@ export default function DatasetRowsPage() {
         <div className="space-y-6">
           <Card className="bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800">
             <CardHeader>
-              <CardTitle className="text-foreground dark:text-white">Dataset Rows</CardTitle>
-              <p className="text-sm text-muted-foreground dark:text-gray-400">
-                Showing {allRows.length} of {totalRows} rows
-              </p>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-foreground dark:text-white">Dataset Rows</CardTitle>
+                  <p className="text-sm text-muted-foreground dark:text-gray-400">
+                    Showing {allRows.length} of {totalRows} rows
+                  </p>
+                </div>
+                <Button
+                  onClick={() => bulkJudgeMutation.mutate(allRows)}
+                  disabled={bulkJudgeMutation.isPending || allRows.length === 0}
+                  data-testid="button-run-bulk-judge"
+                  variant="outline"
+                >
+                  {bulkJudgeMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                  Run LM Judge on All Rows
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               <div 
@@ -534,6 +571,79 @@ export default function DatasetRowsPage() {
                                 key={key}
                                 className="border-gray-700 hover:bg-gray-900"
                                 data-testid={`error-row-${key}`}
+                              >
+                                <TableCell className="text-gray-400 text-sm">
+                                  {errorLabels[key as keyof typeof errorLabels]}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <Badge 
+                                    variant={count > 0 ? "default" : "outline"}
+                                    className={count > 0 ? "bg-red-600 text-white" : "bg-gray-800 text-gray-400 border-gray-600"}
+                                  >
+                                    {count}
+                                  </Badge>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </DialogContent>
+            </Dialog>
+
+          <Dialog open={isBulkJudgeModalOpen} onOpenChange={setIsBulkJudgeModalOpen}>
+              <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto bg-black text-white">
+                <DialogHeader>
+                  <DialogTitle className="text-white flex items-center gap-2">
+                    <AlertCircle className="h-5 w-5" />
+                    LM Judge Analysis - All Rows
+                  </DialogTitle>
+                </DialogHeader>
+                {bulkJudgeResult && (
+                  <div className="space-y-6">
+                    <div>
+                      <h4 className="font-semibold mb-2 text-white">Summary</h4>
+                      <p className="text-sm text-gray-400">{bulkJudgeResult.summary}</p>
+                    </div>
+
+                    <div>
+                      <h4 className="font-semibold mb-3 text-white">Error Counts</h4>
+                      
+                      {(() => {
+                        const totalErrors = Object.values(bulkJudgeResult.errorCounts).reduce((sum, count) => sum + count, 0);
+                        return (
+                          <div className="mb-4 p-4 bg-gray-900 border border-gray-700 rounded-lg">
+                            <div className="flex items-center justify-between">
+                              <span className="text-gray-300 font-medium">Total Failures Across All Rows</span>
+                              <Badge 
+                                variant="default"
+                                className={`text-lg px-4 py-1 ${totalErrors > 0 ? 'bg-red-600 text-white' : 'bg-green-600 text-white'}`}
+                                data-testid="badge-total-errors-bulk"
+                              >
+                                {totalErrors}
+                              </Badge>
+                            </div>
+                          </div>
+                        );
+                      })()}
+                      
+                      <div className="border border-gray-700 rounded-lg overflow-hidden">
+                        <Table>
+                          <TableHeader>
+                            <TableRow className="border-gray-700 hover:bg-gray-900">
+                              <TableHead className="text-gray-300">Error Type</TableHead>
+                              <TableHead className="text-gray-300 text-right">Count</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {Object.entries(bulkJudgeResult.errorCounts).map(([key, count]) => (
+                              <TableRow
+                                key={key}
+                                className="border-gray-700 hover:bg-gray-900"
+                                data-testid={`error-row-bulk-${key}`}
                               >
                                 <TableCell className="text-gray-400 text-sm">
                                   {errorLabels[key as keyof typeof errorLabels]}

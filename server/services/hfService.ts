@@ -410,4 +410,157 @@ Provide your analysis in JSON format:
       throw new Error('Failed to run LM judge analysis');
     }
   }
+
+  async runBulkLmJudge(rows: any[]): Promise<LmJudgeResult> {
+    try {
+      // the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
+      const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+      // Format all rows data for analysis
+      const rowsForAnalysis = rows.map((row, idx) => {
+        return `Row ${row.row_idx || idx}:\n${JSON.stringify(row.row, null, 2)}`;
+      }).join('\n\n---\n\n');
+
+      const prompt = `You are an expert agent communication analyzer. Analyze the following dataset rows containing agent communications and interactions, and identify ALL errors that occurred across all rows.
+
+DATASET ROWS (${rows.length} total):
+${rowsForAnalysis}
+
+ANALYSIS STEPS:
+1. Read through all agent communications and interactions in the dataset rows
+2. Look for errors, failures, exceptions, and problematic patterns across all conversations
+3. Identify specific error indicators in the agent communications
+4. Count occurrences of each error type across ALL rows
+
+ERROR DETECTION RULES (look for these specific patterns):
+
+1. functionCallError - Count if you find:
+   - "invalid arguments", "missing required parameter", "function not found"
+   - TypeError, AttributeError related to function calls
+   - Wrong number of arguments passed to functions
+
+2. malformedJson - Count if you find:
+   - "JSON parse error", "invalid JSON", "Expecting property name"
+   - SyntaxError in JSON parsing
+   - Unterminated strings or objects in JSON
+
+3. factualComputationalError - Count if you find:
+   - Incorrect calculations, wrong results, logic errors
+   - Assertions failed, test failures, wrong outputs
+   - Mathematical or logical mistakes
+
+4. exceededContextWindow - Count if you find:
+   - "context length exceeded", "maximum context", "token limit"
+   - 400/413 errors related to input size
+
+5. misunderstoodInstructions - Count if you find:
+   - Agent did wrong task, ignored requirements
+   - "task not completed", wrong interpretation
+   - Agent stopped before finishing
+
+6. shellToolMisuse - Count if you find:
+   - Command not found, bash errors, invalid shell commands
+   - "permission denied", syntax errors in bash
+   - Incorrect use of shell tools
+
+7. noTaskConfirmation - Count if you find:
+   - Agent didn't respond when asked if task is complete
+   - Missing confirmation messages
+
+8. exhaustedDiskSpace - Count if you find:
+   - "No space left on device", "disk full", "out of space"
+   - ENOSPC errors
+
+9. hallucinatedSolutions - Count if you find:
+   - Mock/fake implementations instead of real solutions
+   - Hardcoded test data, placeholder values
+   - Comments like "TODO", "mock", "fake", "placeholder"
+   - Agent claiming completion without actual work
+
+10. systemFailure - Count if you find:
+   - Out of memory, killed by system, segmentation fault
+   - External process termination, timeout
+   - Infrastructure/environment failures
+
+11. otherAgentError - Count if you find:
+   - Any other agent-related errors not covered above
+   - Unexpected exceptions, runtime errors
+
+IMPORTANT INSTRUCTIONS:
+- Scan ALL rows thoroughly for error patterns
+- Each unique occurrence of an error = count of 1
+- If multiple rows show the same error, count each occurrence
+- Return 0 for categories where no errors are found
+- Provide a brief summary of the dataset and key findings
+
+Provide your analysis in JSON format:
+{
+  "errorCounts": {
+    "functionCallError": <count>,
+    "malformedJson": <count>,
+    "factualComputationalError": <count>,
+    "exceededContextWindow": <count>,
+    "misunderstoodInstructions": <count>,
+    "shellToolMisuse": <count>,
+    "noTaskConfirmation": <count>,
+    "exhaustedDiskSpace": <count>,
+    "hallucinatedSolutions": <count>,
+    "systemFailure": <count>,
+    "otherAgentError": <count>
+  },
+  "summary": "<Brief summary of findings across all ${rows.length} rows>"
+}`;
+
+      const response = await openai.chat.completions.create({
+        model: 'gpt-5',
+        messages: [
+          {
+            role: 'system',
+            content: 'You are an expert agent communication analyzer who identifies failures and issues in agent interactions. Respond with valid JSON only.',
+          },
+          {
+            role: 'user',
+            content: prompt,
+          },
+        ],
+        response_format: { type: 'json_object' },
+        max_completion_tokens: 4096,
+      });
+
+      const rawResult = JSON.parse(response.choices[0].message.content || '{}');
+      
+      // Log the raw LLM response for debugging
+      console.log('Bulk LM Judge Raw Response:', JSON.stringify(rawResult, null, 2));
+      
+      // Ensure all error counts exist and are numbers, defaulting to 0 if missing
+      const errorCounts = {
+        functionCallError: typeof rawResult.errorCounts?.functionCallError === 'number' ? rawResult.errorCounts.functionCallError : 0,
+        malformedJson: typeof rawResult.errorCounts?.malformedJson === 'number' ? rawResult.errorCounts.malformedJson : 0,
+        factualComputationalError: typeof rawResult.errorCounts?.factualComputationalError === 'number' ? rawResult.errorCounts.factualComputationalError : 0,
+        exceededContextWindow: typeof rawResult.errorCounts?.exceededContextWindow === 'number' ? rawResult.errorCounts.exceededContextWindow : 0,
+        misunderstoodInstructions: typeof rawResult.errorCounts?.misunderstoodInstructions === 'number' ? rawResult.errorCounts.misunderstoodInstructions : 0,
+        shellToolMisuse: typeof rawResult.errorCounts?.shellToolMisuse === 'number' ? rawResult.errorCounts.shellToolMisuse : 0,
+        noTaskConfirmation: typeof rawResult.errorCounts?.noTaskConfirmation === 'number' ? rawResult.errorCounts.noTaskConfirmation : 0,
+        exhaustedDiskSpace: typeof rawResult.errorCounts?.exhaustedDiskSpace === 'number' ? rawResult.errorCounts.exhaustedDiskSpace : 0,
+        hallucinatedSolutions: typeof rawResult.errorCounts?.hallucinatedSolutions === 'number' ? rawResult.errorCounts.hallucinatedSolutions : 0,
+        systemFailure: typeof rawResult.errorCounts?.systemFailure === 'number' ? rawResult.errorCounts.systemFailure : 0,
+        otherAgentError: typeof rawResult.errorCounts?.otherAgentError === 'number' ? rawResult.errorCounts.otherAgentError : 0,
+      };
+      
+      const summary = rawResult.summary || `Analyzed ${rows.length} dataset rows`;
+      
+      const result = {
+        runDetails: null,
+        errorCounts,
+        summary,
+      };
+
+      // Validate the result against the schema
+      const validated = lmJudgeResultSchema.parse(result);
+      return validated;
+    } catch (error) {
+      console.error('Error running bulk LM judge:', error);
+      throw new Error('Failed to run bulk LM judge analysis');
+    }
+  }
 }

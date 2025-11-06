@@ -261,6 +261,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/hf/judge-all-rows", async (req, res) => {
+    try {
+      const { rows } = req.body;
+      
+      if (!rows || !Array.isArray(rows)) {
+        return res.status(400).json({ error: "Missing rows parameter" });
+      }
+      
+      console.log(`[Route /api/hf/judge-all-rows] Running bulk judge on ${rows.length} rows`);
+      
+      const result = await hfService.runBulkLmJudge(rows);
+      res.json(result);
+    } catch (error: any) {
+      console.error("Error running bulk LM judge:", error);
+      
+      // Handle OpenAI quota errors specifically
+      if (error.status === 429 || error.code === 'insufficient_quota') {
+        return res.status(429).json({ 
+          error: "OpenAI API quota exceeded. Please check your OpenAI account billing and usage limits.",
+          details: "You have exceeded your current OpenAI API quota."
+        });
+      }
+      
+      // Handle other OpenAI API errors
+      if (error.status && error.message) {
+        return res.status(error.status).json({ 
+          error: error.message 
+        });
+      }
+      
+      res.status(500).json({ error: "Failed to run bulk LM judge analysis" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
