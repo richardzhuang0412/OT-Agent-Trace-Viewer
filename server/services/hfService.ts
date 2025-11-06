@@ -416,9 +416,68 @@ Provide your analysis in JSON format:
       // the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
       const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-      // Format all rows data for analysis
+      // Helper function to extract only relevant data from row to reduce token usage
+      const extractRelevantData = (rowData: any): any => {
+        // If it's a conversation array, extract messages
+        if (Array.isArray(rowData)) {
+          return rowData.map((msg: any) => ({
+            role: msg.role,
+            content: typeof msg.content === 'string' ? 
+              (msg.content.length > 2000 ? msg.content.substring(0, 2000) + '...[truncated]' : msg.content) : 
+              msg.content
+          }));
+        }
+        
+        // If it's an object, extract key fields and avoid large nested data
+        if (typeof rowData === 'object' && rowData !== null) {
+          const extracted: any = {};
+          
+          // Priority fields to always include
+          const priorityFields = ['conversation', 'messages', 'error', 'exception', 'result', 'status', 'task', 'agent', 'model'];
+          
+          for (const key of priorityFields) {
+            if (key in rowData) {
+              if (Array.isArray(rowData[key])) {
+                extracted[key] = extractRelevantData(rowData[key]);
+              } else if (typeof rowData[key] === 'string') {
+                extracted[key] = rowData[key].length > 2000 ? rowData[key].substring(0, 2000) + '...[truncated]' : rowData[key];
+              } else if (typeof rowData[key] === 'object') {
+                extracted[key] = extractRelevantData(rowData[key]);
+              } else {
+                extracted[key] = rowData[key];
+              }
+            }
+          }
+          
+          // If no priority fields found, include all fields but truncate strings
+          if (Object.keys(extracted).length === 0) {
+            for (const [key, value] of Object.entries(rowData)) {
+              if (typeof value === 'string') {
+                extracted[key] = value.length > 500 ? value.substring(0, 500) + '...[truncated]' : value;
+              } else if (Array.isArray(value)) {
+                extracted[key] = value.slice(0, 10); // Limit arrays to 10 items
+              } else if (typeof value === 'object' && value !== null) {
+                // Skip large nested objects
+                extracted[key] = '[object]';
+              } else {
+                extracted[key] = value;
+              }
+            }
+          }
+          
+          return extracted;
+        }
+        
+        return rowData;
+      };
+
+      // Format rows with intelligent data extraction
       const rowsForAnalysis = rows.map((row, idx) => {
-        return `Row ${row.row_idx || idx}:\n${JSON.stringify(row.row, null, 2)}`;
+        const relevantData = extractRelevantData(row.row);
+        const dataStr = JSON.stringify(relevantData, null, 2);
+        // Further truncate if still too large (max 5000 chars per row)
+        const truncatedData = dataStr.length > 5000 ? dataStr.substring(0, 5000) + '\n...[truncated]' : dataStr;
+        return `Row ${row.row_idx || idx}:\n${truncatedData}`;
       }).join('\n\n---\n\n');
 
       const prompt = `You are an expert agent communication analyzer. Analyze the following dataset rows containing agent communications and interactions, and identify ALL errors that occurred across all rows.
