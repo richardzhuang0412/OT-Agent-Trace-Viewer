@@ -21,16 +21,22 @@ export default function DatasetRowsPage() {
   const [judgeResult, setJudgeResult] = useState<LmJudgeResult | null>(null);
   const [currentPage, setCurrentPage] = useState(0);
   const [isJudgeModalOpen, setIsJudgeModalOpen] = useState(false);
+  const [allRows, setAllRows] = useState<any[]>([]);
+  const [rowsOffset, setRowsOffset] = useState(0);
+  const [totalRows, setTotalRows] = useState(0);
   const { toast } = useToast();
   const tarSectionRef = useRef<HTMLDivElement>(null);
+  const tableScrollRef = useRef<HTMLDivElement>(null);
+  const lastLoadedOffsetRef = useRef<number>(-1);
   
   const filesPerPage = 100;
+  const rowsPerPage = 10;
 
-  const { data: rowsData, isLoading, error: rowsError } = useQuery<HfDatasetRowsResponse>({
-    queryKey: ['/api/hf/rows', datasetId],
+  const { data: rowsData, isLoading, error: rowsError, refetch: refetchRows } = useQuery<HfDatasetRowsResponse>({
+    queryKey: ['/api/hf/rows', datasetId, rowsOffset],
     queryFn: async () => {
       // Request only 10 rows at a time to avoid huge responses (each row can be 1-2MB)
-      const response = await fetch(`/api/hf/rows?dataset=${encodeURIComponent(datasetId)}&length=10`);
+      const response = await fetch(`/api/hf/rows?dataset=${encodeURIComponent(datasetId)}&length=${rowsPerPage}&offset=${rowsOffset}`);
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         console.error('Failed to fetch dataset rows:', {
@@ -43,7 +49,37 @@ export default function DatasetRowsPage() {
       return response.json();
     },
     enabled: !!datasetId,
+    refetchOnWindowFocus: false, // Prevent duplicate rows on window focus
+    refetchOnReconnect: false, // Prevent duplicate rows on reconnect
   });
+
+  // Reset pagination state when dataset changes
+  useEffect(() => {
+    setRowsOffset(0);
+    setAllRows([]);
+    setTotalRows(0);
+    setSelectedRow(null);
+    setTarContents(null);
+    setJudgeResult(null);
+    lastLoadedOffsetRef.current = -1;
+  }, [datasetId]);
+
+  // Update allRows when new data is fetched
+  useEffect(() => {
+    if (rowsData?.rows) {
+      if (rowsOffset === 0) {
+        // First load or refetch at offset 0 - always replace
+        setAllRows(rowsData.rows);
+        lastLoadedOffsetRef.current = 0;
+      } else if (lastLoadedOffsetRef.current !== rowsOffset) {
+        // New offset - append rows
+        setAllRows(prev => [...prev, ...rowsData.rows]);
+        lastLoadedOffsetRef.current = rowsOffset;
+      }
+      // If lastLoadedOffsetRef.current === rowsOffset and offset !== 0, skip (duplicate refetch)
+      setTotalRows(rowsData.num_rows_total || 0);
+    }
+  }, [rowsData, rowsOffset]);
 
   // Show error toast when rows fail to load
   useEffect(() => {
@@ -149,6 +185,20 @@ export default function DatasetRowsPage() {
     }
   };
 
+  // Infinite scroll handler
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const target = e.currentTarget;
+    const scrollPosition = target.scrollTop + target.clientHeight;
+    const scrollHeight = target.scrollHeight;
+    
+    // Load more when scrolled within 100px of bottom
+    const isNearBottom = scrollHeight - scrollPosition < 100;
+    
+    if (isNearBottom && !isLoading && allRows.length < totalRows) {
+      setRowsOffset(prev => prev + rowsPerPage);
+    }
+  };
+
   const handleNextPage = () => {
     setCurrentPage(prev => prev + 1);
   };
@@ -171,7 +221,10 @@ export default function DatasetRowsPage() {
     otherAgentError: 'Any other agent-caused error',
   };
 
-  if (isLoading) {
+  // Only show skeleton on truly initial load (first fetch at offset 0)
+  const isInitialLoading = isLoading && rowsOffset === 0 && allRows.length === 0;
+  
+  if (isInitialLoading) {
     return (
       <div className="min-h-screen bg-background p-8">
         <div className="max-w-7xl mx-auto">
@@ -205,11 +258,15 @@ export default function DatasetRowsPage() {
             <CardHeader>
               <CardTitle className="text-foreground dark:text-white">Dataset Rows</CardTitle>
               <p className="text-sm text-muted-foreground dark:text-gray-400">
-                Total: {rowsData?.num_rows_total || 0} rows
+                Showing {allRows.length} of {totalRows} rows
               </p>
             </CardHeader>
             <CardContent>
-              <div className="max-h-[600px] overflow-auto">
+              <div 
+                ref={tableScrollRef}
+                className="max-h-[600px] overflow-auto"
+                onScroll={handleScroll}
+              >
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -218,32 +275,54 @@ export default function DatasetRowsPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {rowsData?.rows.map((row) => (
-                      <TableRow
-                        key={row.row_idx}
-                        className={`cursor-pointer transition-colors ${
-                          selectedRow === row.row_idx 
-                            ? 'bg-primary/20 dark:bg-primary/30 border-l-4 border-primary' 
-                            : 'hover:bg-muted/50 dark:hover:bg-gray-800/50'
-                        }`}
-                        onClick={() => handleRowClick(row.row_idx, row.row)}
-                        data-testid={`row-dataset-${row.row_idx}`}
-                      >
-                        <TableCell className="font-medium text-foreground dark:text-white">
-                          <div className="flex items-center gap-2">
-                            {selectedRow === row.row_idx && extractTarMutation.isPending && (
-                              <Loader2 className="h-4 w-4 animate-spin text-primary" data-testid="loader-row-loading" />
-                            )}
-                            {row.row_idx}
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-sm text-muted-foreground dark:text-gray-400">
-                          <div className="max-w-md truncate">
-                            {JSON.stringify(row.row).substring(0, 100)}...
+                    {allRows.length === 0 && !isLoading ? (
+                      <TableRow>
+                        <TableCell colSpan={2} className="text-center py-8">
+                          <div className="text-muted-foreground">
+                            No rows found in this dataset
                           </div>
                         </TableCell>
                       </TableRow>
-                    ))}
+                    ) : (
+                      <>
+                        {allRows.map((row) => (
+                          <TableRow
+                            key={row.row_idx}
+                            className={`cursor-pointer transition-colors ${
+                              selectedRow === row.row_idx 
+                                ? 'bg-primary/20 dark:bg-primary/30 border-l-4 border-primary' 
+                                : 'hover:bg-muted/50 dark:hover:bg-gray-800/50'
+                            }`}
+                            onClick={() => handleRowClick(row.row_idx, row.row)}
+                            data-testid={`row-dataset-${row.row_idx}`}
+                          >
+                            <TableCell className="font-medium text-foreground dark:text-white">
+                              <div className="flex items-center gap-2">
+                                {selectedRow === row.row_idx && extractTarMutation.isPending && (
+                                  <Loader2 className="h-4 w-4 animate-spin text-primary" data-testid="loader-row-loading" />
+                                )}
+                                {row.row_idx}
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-sm text-muted-foreground dark:text-gray-400">
+                              <div className="max-w-md truncate">
+                                {JSON.stringify(row.row).substring(0, 100)}...
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                        {isLoading && allRows.length > 0 && (
+                          <TableRow>
+                            <TableCell colSpan={2} className="text-center py-4">
+                              <div className="flex items-center justify-center gap-2 text-muted-foreground">
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                <span>Loading more rows...</span>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </>
+                    )}
                   </TableBody>
                 </Table>
               </div>
