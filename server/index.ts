@@ -96,11 +96,18 @@ app.use((req, res, next) => {
     const port = parseInt(process.env.PORT || '5000', 10);
     
     console.log(`Starting server on 0.0.0.0:${port}...`);
-    server.listen({
+    // Note: reusePort is not supported on macOS, so we only enable it on Linux
+    const listenOptions: any = {
       port,
       host: "0.0.0.0",
-      reusePort: true,
-    }, () => {
+    };
+
+    // Only enable reusePort on Linux (not supported on macOS/Darwin)
+    if (process.platform === 'linux') {
+      listenOptions.reusePort = true;
+    }
+
+    server.listen(listenOptions, () => {
       log(`serving on port ${port}`);
       console.log(`✓ Server successfully started and listening on 0.0.0.0:${port}`);
     });

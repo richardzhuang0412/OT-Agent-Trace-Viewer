@@ -146,3 +146,68 @@ export type HfDatasetRow = z.infer<typeof hfDatasetRowSchema>;
 export type HfDatasetRowsResponse = z.infer<typeof hfDatasetRowsResponseSchema>;
 export type TarFileContent = z.infer<typeof tarFileContentSchema>;
 export type LmJudgeResult = z.infer<typeof lmJudgeResultSchema>;
+
+// ATIF (Agent Trace Format) trace schemas
+export const atifTurnSchema = z.object({
+  role: z.enum(['user', 'assistant', 'system']),
+  content: z.string(),
+});
+
+export const atifTraceSchema = z.object({
+  // Metadata fields
+  agent: z.string(),
+  model: z.string(),
+  model_provider: z.string(),
+  date: z.string(),
+  task: z.string(),
+  episode: z.union([z.string(), z.number()]),
+  run_id: z.string(),
+  trial_name: z.string(),
+
+  // Conversation data
+  conversations: z.array(atifTurnSchema),
+});
+
+// Parsed/structured turn for display
+export const parsedTurnSchema = z.object({
+  role: z.string(),
+  sections: z.object({
+    thoughts: z.string().optional(),
+    actions: z.string().optional(),
+    observations: z.string().optional(),
+    results: z.string().optional(),
+    raw: z.string(),
+  }),
+});
+
+// Filter parameters for querying traces
+export const traceFilterParamsSchema = z.object({
+  run_id: z.string().optional(),
+  model: z.string().optional(),
+  task: z.string().optional(),
+  trial_name: z.string().optional(),
+  limit: z.number().optional().default(50),
+  offset: z.number().optional().default(0),
+});
+
+// Response for trace list endpoint
+export const traceListResponseSchema = z.object({
+  traces: z.array(atifTraceSchema),
+  total: z.number(),
+  nextOffset: z.number().optional(),
+});
+
+// Metadata for filter dropdowns/options
+export const traceMetadataSchema = z.object({
+  models: z.array(z.string()),
+  tasks: z.array(z.string()),
+  agents: z.array(z.string()),
+  trial_names: z.array(z.string()),
+});
+
+export type AtifTurn = z.infer<typeof atifTurnSchema>;
+export type AtifTrace = z.infer<typeof atifTraceSchema>;
+export type ParsedTurn = z.infer<typeof parsedTurnSchema>;
+export type TraceFilterParams = z.infer<typeof traceFilterParamsSchema>;
+export type TraceListResponse = z.infer<typeof traceListResponseSchema>;
+export type TraceMetadata = z.infer<typeof traceMetadataSchema>;

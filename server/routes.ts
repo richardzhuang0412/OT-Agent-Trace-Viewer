@@ -2,11 +2,13 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { S3Service } from "./services/s3Service";
 import { HfService } from "./services/hfService";
+import { TraceService } from "./services/traceService";
 import { z } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   const s3Service = new S3Service();
   const hfService = new HfService();
+  const traceService = new TraceService();
 
   // Health check endpoint for deployment verification
   app.get("/api/health", (_req, res) => {
@@ -292,6 +294,85 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       res.status(500).json({ error: "Failed to run bulk LM judge analysis" });
+    }
+  });
+
+  // ATIF Trace routes
+  app.get("/api/traces/list", async (req, res) => {
+    try {
+      const { dataset, run_id, model, task, trial_name, limit, offset } = req.query;
+
+      if (!dataset || typeof dataset !== 'string') {
+        return res.status(400).json({ error: "Missing or invalid dataset parameter" });
+      }
+
+      const filters = {
+        run_id: run_id as string | undefined,
+        model: model as string | undefined,
+        task: task as string | undefined,
+        trial_name: trial_name as string | undefined,
+        limit: limit ? parseInt(limit as string) : 50,
+        offset: offset ? parseInt(offset as string) : 0,
+      };
+
+      const result = await traceService.listTraces(dataset, filters);
+      res.json(result);
+    } catch (error) {
+      console.error("Error listing traces:", error);
+      res.status(500).json({ error: "Failed to fetch traces" });
+    }
+  });
+
+  app.get("/api/traces/:dataset/:runId", async (req, res) => {
+    try {
+      const { dataset, runId } = req.params;
+
+      if (!dataset || !runId) {
+        return res.status(400).json({ error: "Missing dataset or runId parameter" });
+      }
+
+      const trace = await traceService.getTrace(dataset, runId);
+
+      if (!trace) {
+        return res.status(404).json({ error: "Trace not found" });
+      }
+
+      res.json(trace);
+    } catch (error) {
+      console.error("Error fetching trace:", error);
+      res.status(500).json({ error: "Failed to fetch trace" });
+    }
+  });
+
+  app.get("/api/traces/:dataset/metadata", async (req, res) => {
+    try {
+      const { dataset } = req.params;
+
+      if (!dataset) {
+        return res.status(400).json({ error: "Missing dataset parameter" });
+      }
+
+      const metadata = await traceService.getMetadata(dataset);
+      res.json(metadata);
+    } catch (error) {
+      console.error("Error fetching trace metadata:", error);
+      res.status(500).json({ error: "Failed to fetch trace metadata" });
+    }
+  });
+
+  app.post("/api/traces/:dataset/clear-cache", async (req, res) => {
+    try {
+      const { dataset } = req.params;
+
+      if (!dataset) {
+        return res.status(400).json({ error: "Missing dataset parameter" });
+      }
+
+      traceService.clearCache(dataset);
+      res.json({ message: "Cache cleared successfully" });
+    } catch (error) {
+      console.error("Error clearing cache:", error);
+      res.status(500).json({ error: "Failed to clear cache" });
     }
   });
 
