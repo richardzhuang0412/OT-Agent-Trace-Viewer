@@ -1,9 +1,9 @@
-import { useState } from 'react';
-import { Link, useLocation } from 'wouter';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Zap, ArrowLeft, Search } from 'lucide-react';
+import { Search, Zap } from 'lucide-react';
+import { useState } from 'react';
+import { useLocation } from 'wouter';
 
 export default function TracesPage() {
   const [, setLocation] = useLocation();
@@ -19,14 +19,7 @@ export default function TracesPage() {
     <div className="min-h-screen bg-background dark:bg-gray-950 p-8">
       <div className="max-w-4xl mx-auto">
         <div className="mb-8">
-          <div className="flex items-center gap-4 mb-4">
-            <Link href="/datasets">
-              <Button variant="ghost" size="sm">
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Back to Datasets
-              </Button>
-            </Link>
-          </div>
+
           <h1 className="text-4xl font-bold text-foreground dark:text-white mb-2">
             ATIF Trace Viewer
           </h1>

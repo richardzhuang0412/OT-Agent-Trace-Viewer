@@ -1,11 +1,11 @@
-import { useState, useMemo } from 'react';
-import { useParams, useLocation } from 'wouter';
-import { ArrowLeft, RefreshCw } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { TraceFilterPanel } from '@/components/TraceFilterPanel';
 import { TraceListViewer } from '@/components/TraceListViewer';
-import { useTraceList, useClearTraceCache } from '@/hooks/useTraces';
+import { Button } from '@/components/ui/button';
+import { useClearTraceCache, useTraceList } from '@/hooks/useTraces';
 import type { TraceFilterParams } from '@shared/schema';
+import { ArrowLeft, ExternalLink, RefreshCw } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { useLocation, useParams } from 'wouter';
 
 export default function TraceBrowserPage() {
   const params = useParams<{ datasetId: string }>();
@@ -87,6 +87,15 @@ export default function TraceBrowserPage() {
             >
               <RefreshCw className={`h-4 w-4 ${isLoadingTraces ? 'animate-spin' : ''}`} />
               Refresh
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => window.open(`https://huggingface.co/datasets/${datasetId}`, '_blank')}
+              className="gap-2"
+            >
+              <ExternalLink className="h-4 w-4" />
+              View on HuggingFace
             </Button>
           </div>
 

@@ -1,9 +1,8 @@
-import { useMemo } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { TurnBreakdownDisplay } from './TurnBreakdownDisplay';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import type { AtifTrace } from '@shared/schema';
+import { useMemo } from 'react';
+import { TurnBreakdownDisplay } from './TurnBreakdownDisplay';
 
 interface ConversationViewerProps {
   trace: AtifTrace;
@@ -42,56 +41,59 @@ export function ConversationViewer({
   ];
 
   const content = (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Metadata Section */}
-      <Card className="bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800">
-        <CardHeader>
-          <CardTitle className="text-lg">Trace Metadata</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 gap-4">
-            {metadata.map(({ label, value }) => (
-              <div key={label}>
-                <p className="text-xs font-semibold text-muted-foreground dark:text-gray-400 uppercase tracking-wide">
-                  {label}
-                </p>
-                <p className="text-sm font-mono text-foreground dark:text-gray-100 mt-1 break-all">
-                  {value}
-                </p>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+      <div className="bg-gray-50 dark:bg-gray-900/50 p-4 rounded-lg border border-gray-200 dark:border-gray-800">
+        <h3 className="text-sm font-bold text-black dark:text-white mb-4 flex items-center gap-2">
+          <Badge variant="outline" className="bg-gray-100 dark:bg-gray-800 text-black dark:text-white border-gray-300 dark:border-gray-600">Metadata</Badge>
+        </h3>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+          {metadata.map(({ label, value }) => (
+            <div key={label}>
+              <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">
+                {label}
+              </p>
+              <p className="text-sm font-mono text-gray-900 dark:text-gray-100 font-medium break-all">
+                {value}
+              </p>
+            </div>
+          ))}
+        </div>
+      </div>
 
       {/* Conversation Section */}
-      <Card className="bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800">
-        <CardHeader>
-          <CardTitle className="text-lg">
-            Conversation ({trace.conversations.length} turns)
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {parsedTurns.length === 0 ? (
-              <p className="text-sm text-muted-foreground dark:text-gray-400">
-                No turns in this conversation
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
+            Interaction History
+          </h3>
+          <Badge variant="secondary">
+            {trace.conversations.length} turns
+          </Badge>
+        </div>
+        
+        <div className="space-y-6">
+          {parsedTurns.length === 0 ? (
+            <div className="text-center py-12 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-dashed border-gray-300 dark:border-gray-700">
+              <p className="text-gray-500 dark:text-gray-400">
+                No interaction turns found in this trace.
               </p>
-            ) : (
-              parsedTurns.map((turn, index) => (
-                <TurnBreakdownDisplay key={index} turn={turn} index={index} />
-              ))
-            )}
-          </div>
-        </CardContent>
-      </Card>
+            </div>
+          ) : (
+            parsedTurns.map((turn, index) => (
+              <TurnBreakdownDisplay key={index} turn={turn} index={index} />
+            ))
+          )}
+        </div>
+      </div>
 
-      {/* Summary Info */}
-      <div className="text-xs text-muted-foreground dark:text-gray-400">
-        <p>Total turns: {trace.conversations.length}</p>
-        <p className="mt-1">
-          Model Provider: <Badge variant="outline">{trace.model_provider}</Badge>
-        </p>
+      {/* Footer Info */}
+      <div className="pt-4 border-t border-gray-200 dark:border-gray-800 flex justify-between items-center text-xs text-gray-500 dark:text-gray-400">
+        <span>Run ID: {trace.run_id}</span>
+        <div className="flex items-center gap-2">
+          <span>Model Provider:</span>
+          <Badge variant="outline" className="text-xs">{trace.model_provider}</Badge>
+        </div>
       </div>
     </div>
   );
@@ -99,9 +101,9 @@ export function ConversationViewer({
   if (isModal) {
     return (
       <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose?.()}>
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto bg-white dark:bg-gray-950 text-foreground dark:text-gray-100">
           <DialogHeader>
-            <DialogTitle>Trace: {trace.run_id}</DialogTitle>
+            <DialogTitle className="text-xl font-bold text-black dark:text-white">Trace: {trace.run_id}</DialogTitle>
           </DialogHeader>
           <div className="pr-4">{content}</div>
         </DialogContent>

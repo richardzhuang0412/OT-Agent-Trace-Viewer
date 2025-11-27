@@ -1,11 +1,11 @@
-import { useState, useCallback, memo } from 'react';
-import { ChevronDown, ChevronRight, Loader2 } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import type { AtifTrace } from '@shared/schema';
+import { ChevronDown, ChevronRight, Loader2 } from 'lucide-react';
+import { memo, useCallback, useState } from 'react';
 import { ConversationViewer } from './ConversationViewer';
 import { PaginationControls } from './PaginationControls';
-import type { AtifTrace } from '@shared/schema';
 
 interface TraceListViewerProps {
   traces: AtifTrace[];
@@ -33,13 +33,13 @@ export function TraceListViewer({
   const [expandedTraces, setExpandedTraces] = useState<Set<string>>(new Set());
   const [selectedTrace, setSelectedTrace] = useState<AtifTrace | null>(null);
 
-  const toggleExpanded = useCallback((runId: string) => {
+  const toggleExpanded = useCallback((uniqueId: string) => {
     setExpandedTraces((prev) => {
       const newExpanded = new Set(prev);
-      if (newExpanded.has(runId)) {
-        newExpanded.delete(runId);
+      if (newExpanded.has(uniqueId)) {
+        newExpanded.delete(uniqueId);
       } else {
-        newExpanded.add(runId);
+        newExpanded.add(uniqueId);
       }
       return newExpanded;
     });
@@ -81,15 +81,19 @@ export function TraceListViewer({
         </CardHeader>
         <CardContent>
           <div className="space-y-2">
-            {traces.map((trace) => (
-              <TraceRowWrapper
-                key={trace.run_id}
-                trace={trace}
-                expanded={expandedTraces.has(trace.run_id)}
-                onToggleExpand={toggleExpanded}
-                onViewDetails={selectTrace}
-              />
-            ))}
+            {traces.map((trace, index) => {
+              const uniqueId = `${trace.run_id}-${index}`;
+              return (
+                <TraceRowWrapper
+                  key={uniqueId}
+                  uniqueId={uniqueId}
+                  trace={trace}
+                  expanded={expandedTraces.has(uniqueId)}
+                  onToggleExpand={toggleExpanded}
+                  onViewDetails={selectTrace}
+                />
+              );
+            })}
           </div>
 
           {isLoading && (
@@ -128,21 +132,23 @@ export function TraceListViewer({
 }
 
 interface TraceRowWrapperProps {
+  uniqueId: string;
   trace: AtifTrace;
   expanded: boolean;
-  onToggleExpand: (runId: string) => void;
+  onToggleExpand: (uniqueId: string) => void;
   onViewDetails: (trace: AtifTrace) => void;
 }
 
 const TraceRowWrapper = memo(function TraceRowWrapper({
+  uniqueId,
   trace,
   expanded,
   onToggleExpand,
   onViewDetails,
 }: TraceRowWrapperProps) {
   const handleToggleExpand = useCallback(() => {
-    onToggleExpand(trace.run_id);
-  }, [trace.run_id, onToggleExpand]);
+    onToggleExpand(uniqueId);
+  }, [uniqueId, onToggleExpand]);
 
   const handleViewDetails = useCallback(() => {
     onViewDetails(trace);
@@ -184,18 +190,15 @@ const TraceRow = memo(function TraceRow({
         )}
 
         <div className="flex-1 min-w-0">
-          <p className="font-mono text-sm font-semibold text-foreground dark:text-gray-100 truncate">
-            {trace.run_id}
+          <p className="font-bold text-base text-foreground dark:text-gray-100 truncate mb-1">
+            {trace.task}
           </p>
-          <div className="flex gap-2 mt-1 flex-wrap">
-            <Badge variant="outline" className="text-xs">
-              {trace.model}
+          <div className="flex gap-2 flex-wrap items-center">
+            <Badge variant="secondary" className="text-xs font-normal">
+              Model: {trace.model}
             </Badge>
-            <Badge variant="outline" className="text-xs">
-              {trace.task}
-            </Badge>
-            <Badge variant="outline" className="text-xs">
-              {trace.agent}
+            <Badge variant="outline" className="text-xs font-normal">
+              Agent: {trace.agent}
             </Badge>
           </div>
         </div>
