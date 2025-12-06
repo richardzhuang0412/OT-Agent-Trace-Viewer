@@ -211,3 +211,26 @@ export type ParsedTurn = z.infer<typeof parsedTurnSchema>;
 export type TraceFilterParams = z.infer<typeof traceFilterParamsSchema>;
 export type TraceListResponse = z.infer<typeof traceListResponseSchema>;
 export type TraceMetadata = z.infer<typeof traceMetadataSchema>;
+
+// Task dataset schemas for HuggingFace task parquet datasets
+export const extractedFileSchema = z.object({
+  path: z.string(),
+  content: z.string().optional(), // Only for text files
+  size: z.number(),
+  isText: z.boolean(),
+});
+
+export const taskDetailSchema = z.object({
+  path: z.string(),
+  files: z.array(extractedFileSchema),
+});
+
+export const taskListResponseSchema = z.object({
+  tasks: z.array(taskDetailSchema),
+  total: z.number(),
+  nextOffset: z.number().optional(),
+});
+
+export type ExtractedFile = z.infer<typeof extractedFileSchema>;
+export type TaskDetail = z.infer<typeof taskDetailSchema>;
+export type TaskListResponse = z.infer<typeof taskListResponseSchema>;

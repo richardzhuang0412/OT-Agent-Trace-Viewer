@@ -3,11 +3,14 @@ import { createServer, type Server } from "http";
 import { S3Service } from "./services/s3Service";
 
 import { TraceService } from "./services/traceService";
+import { TaskService } from "./services/taskService";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   const s3Service = new S3Service();
 
   const traceService = new TraceService();
+
+  const taskService = new TaskService();
 
   // Health check endpoint for deployment verification
   app.get("/api/health", (_req, res) => {
@@ -223,6 +226,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ message: "Cache cleared successfully" });
     } catch (error) {
       console.error("Error clearing cache:", error);
+      res.status(500).json({ error: "Failed to clear cache" });
+    }
+  });
+
+  // Task dataset routes
+  app.get("/api/tasks/list", async (req, res) => {
+    try {
+      const { dataset, limit, offset } = req.query;
+
+      if (!dataset || typeof dataset !== 'string') {
+        return res.status(400).json({ error: "Missing or invalid dataset parameter" });
+      }
+
+      const parsedLimit = limit ? parseInt(limit as string) : 50;
+      const parsedOffset = offset ? parseInt(offset as string) : 0;
+
+      const result = await taskService.listTasks(dataset, parsedLimit, parsedOffset);
+      res.json(result);
+    } catch (error) {
+      console.error("Error listing tasks:", error);
+      res.status(500).json({ error: "Failed to fetch tasks" });
+    }
+  });
+
+  app.post("/api/tasks/:dataset/clear-cache", async (req, res) => {
+    try {
+      const { dataset } = req.params;
+
+      if (!dataset) {
+        return res.status(400).json({ error: "Missing dataset parameter" });
+      }
+
+      taskService.clearCache(dataset);
+      res.json({ message: "Cache cleared successfully" });
+    } catch (error) {
+      console.error("Error clearing task cache:", error);
       res.status(500).json({ error: "Failed to clear cache" });
     }
   });
