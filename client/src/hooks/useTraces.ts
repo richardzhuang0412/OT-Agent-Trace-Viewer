@@ -2,6 +2,28 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { AtifTrace, TraceFilterParams, TraceListResponse, TraceMetadata } from "@shared/schema";
 
 /**
+ * Helper to check if response is JSON and parse it safely
+ */
+async function parseJsonResponse<T>(response: Response, errorPrefix: string): Promise<T> {
+  const contentType = response.headers.get('content-type');
+  const isJson = contentType && contentType.includes('application/json');
+
+  if (!response.ok) {
+    if (isJson) {
+      const error = await response.json().catch(() => ({ error: 'Unknown error' }));
+      throw new Error(error.error || `${errorPrefix}: ${response.statusText}`);
+    }
+    throw new Error(`${errorPrefix}: ${response.status} ${response.statusText}`);
+  }
+
+  if (!isJson) {
+    throw new Error(`${errorPrefix}: Invalid response from server`);
+  }
+
+  return response.json();
+}
+
+/**
  * Hook to fetch a list of traces with optional filtering
  */
 export function useTraceList(dataset: string, filters: Partial<TraceFilterParams> = {}) {
@@ -19,10 +41,7 @@ export function useTraceList(dataset: string, filters: Partial<TraceFilterParams
       });
 
       const response = await fetch(`/api/traces/list?${params}`);
-      if (!response.ok) {
-        throw new Error(`Failed to fetch traces: ${response.statusText}`);
-      }
-      return response.json();
+      return parseJsonResponse<TraceListResponse>(response, 'Failed to fetch traces');
     },
     enabled: !!dataset,
     staleTime: 5 * 60 * 1000, // 5 minutes
@@ -37,10 +56,7 @@ export function useTrace(dataset: string, runId: string) {
     queryKey: ["/api/traces", dataset, runId],
     queryFn: async () => {
       const response = await fetch(`/api/traces/${dataset}/${runId}`);
-      if (!response.ok) {
-        throw new Error(`Failed to fetch trace: ${response.statusText}`);
-      }
-      return response.json();
+      return parseJsonResponse<AtifTrace>(response, 'Failed to fetch trace');
     },
     enabled: !!dataset && !!runId,
     staleTime: 10 * 60 * 1000, // 10 minutes
@@ -55,10 +71,7 @@ export function useTraceMetadata(dataset: string) {
     queryKey: ["/api/traces/metadata", dataset],
     queryFn: async () => {
       const response = await fetch(`/api/traces/${dataset}/metadata`);
-      if (!response.ok) {
-        throw new Error(`Failed to fetch metadata: ${response.statusText}`);
-      }
-      return response.json();
+      return parseJsonResponse<TraceMetadata>(response, 'Failed to fetch metadata');
     },
     enabled: !!dataset,
     staleTime: 10 * 60 * 1000, // 10 minutes
@@ -76,9 +89,18 @@ export function useClearTraceCache() {
       const response = await fetch(`/api/traces/${dataset}/clear-cache`, {
         method: "POST",
       });
+      
+      const contentType = response.headers.get('content-type');
+      const isJson = contentType && contentType.includes('application/json');
+      
       if (!response.ok) {
-        throw new Error(`Failed to clear cache: ${response.statusText}`);
+        if (isJson) {
+          const error = await response.json().catch(() => ({ error: 'Unknown error' }));
+          throw new Error(error.error || `Failed to clear cache: ${response.statusText}`);
+        }
+        throw new Error(`Failed to clear cache: ${response.status} ${response.statusText}`);
       }
+      
       // Invalidate all trace queries for this dataset
       queryClient.invalidateQueries({
         queryKey: ["/api/traces/list", dataset],

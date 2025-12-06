@@ -13,9 +13,20 @@ async function fetchTaskList(dataset: string, limit: number, offset: number): Pr
 
   const response = await fetch(`/api/tasks/list?${params}`);
 
+  // Check if response is JSON before attempting to parse
+  const contentType = response.headers.get('content-type');
+  const isJson = contentType && contentType.includes('application/json');
+
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: 'Unknown error' }));
-    throw new Error(error.error || 'Failed to fetch tasks');
+    if (isJson) {
+      const error = await response.json().catch(() => ({ error: 'Unknown error' }));
+      throw new Error(error.error || 'Failed to fetch tasks');
+    }
+    throw new Error(`Server error: ${response.status} ${response.statusText}`);
+  }
+
+  if (!isJson) {
+    throw new Error('Invalid response from server. Please try again later.');
   }
 
   return response.json();
