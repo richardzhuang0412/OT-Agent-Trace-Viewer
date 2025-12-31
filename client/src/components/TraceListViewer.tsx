@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import type { AtifTrace } from '@shared/schema';
 import { ChevronDown, ChevronRight, Loader2 } from 'lucide-react';
 import { memo, useCallback, useState } from 'react';
+import type { MouseEvent } from 'react';
 import { ConversationViewer } from './ConversationViewer';
 import { PaginationControls } from './PaginationControls';
 
@@ -15,6 +16,7 @@ interface TraceListViewerProps {
   totalPages: number;
   pageSize: number;
   totalItems: number;
+  datasetId: string;
   onPageChange: (page: number) => void;
   onPageSizeChange: (pageSize: number) => void;
 }
@@ -27,6 +29,7 @@ export function TraceListViewer({
   totalPages,
   pageSize,
   totalItems,
+  datasetId,
   onPageChange,
   onPageSizeChange,
 }: TraceListViewerProps) {
@@ -91,6 +94,7 @@ export function TraceListViewer({
                   expanded={expandedTraces.has(uniqueId)}
                   onToggleExpand={toggleExpanded}
                   onViewDetails={selectTrace}
+                  datasetId={datasetId}
                 />
               );
             })}
@@ -135,6 +139,7 @@ interface TraceRowWrapperProps {
   uniqueId: string;
   trace: AtifTrace;
   expanded: boolean;
+  datasetId: string;
   onToggleExpand: (uniqueId: string) => void;
   onViewDetails: (trace: AtifTrace) => void;
 }
@@ -143,6 +148,7 @@ const TraceRowWrapper = memo(function TraceRowWrapper({
   uniqueId,
   trace,
   expanded,
+  datasetId,
   onToggleExpand,
   onViewDetails,
 }: TraceRowWrapperProps) {
@@ -157,6 +163,7 @@ const TraceRowWrapper = memo(function TraceRowWrapper({
   return (
     <TraceRow
       trace={trace}
+      datasetId={datasetId}
       expanded={expanded}
       onToggleExpand={handleToggleExpand}
       onViewDetails={handleViewDetails}
@@ -166,6 +173,7 @@ const TraceRowWrapper = memo(function TraceRowWrapper({
 
 interface TraceRowProps {
   trace: AtifTrace;
+  datasetId: string;
   expanded: boolean;
   onToggleExpand: () => void;
   onViewDetails: () => void;
@@ -173,10 +181,49 @@ interface TraceRowProps {
 
 const TraceRow = memo(function TraceRow({
   trace,
+  datasetId,
   expanded,
   onToggleExpand,
   onViewDetails,
 }: TraceRowProps) {
+  const [judging, setJudging] = useState(false);
+  const [judgment, setJudgment] = useState<string | null>(null);
+  const [judgeError, setJudgeError] = useState<string | null>(null);
+
+  const handleJudge = useCallback(
+    async (event: MouseEvent<HTMLButtonElement>) => {
+      event.stopPropagation();
+      if (judging) return;
+      setJudging(true);
+      setJudgeError(null);
+
+      try {
+        const response = await fetch(
+          `/api/traces/${encodeURIComponent(datasetId)}/${encodeURIComponent(trace.run_id)}/judge`,
+          { method: 'POST' },
+        );
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to generate judgment');
+        }
+        setJudgment(data.analysis || 'No analysis generated.');
+      } catch (error) {
+        setJudgment(null);
+        setJudgeError(error instanceof Error ? error.message : 'Failed to generate judgment');
+      } finally {
+        setJudging(false);
+      }
+    },
+    [datasetId, judging, trace.run_id],
+  );
+
+  const resultDisplay =
+    trace.result === undefined || trace.result === null
+      ? 'N/A'
+      : typeof trace.result === 'number'
+      ? trace.result.toFixed(3).replace(/\.?0+$/, (match) => (match === '.' ? '' : match))
+      : String(trace.result);
+
   return (
     <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
       <div
@@ -250,19 +297,45 @@ const TraceRow = memo(function TraceRow({
               <p className="font-semibold text-foreground dark:text-gray-300">Date:</p>
               <p className="text-muted-foreground dark:text-gray-400">{trace.date}</p>
             </div>
+            <div>
+              <p className="font-semibold text-foreground dark:text-gray-300">Result:</p>
+              <p className="text-muted-foreground dark:text-gray-400">{resultDisplay}</p>
+            </div>
           </div>
 
-          <Button
-            onClick={(e) => {
-              e.stopPropagation();
-              onViewDetails();
-            }}
-            variant="default"
-            size="sm"
-            className="w-full"
-          >
-            View Full Conversation
-          </Button>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <Button
+              onClick={(e) => {
+                e.stopPropagation();
+                onViewDetails();
+              }}
+              variant="default"
+              size="sm"
+              className="flex-1"
+            >
+              View Full Conversation
+            </Button>
+            <Button
+              onClick={handleJudge}
+              variant="outline"
+              size="sm"
+              disabled={judging}
+              className="flex-1"
+            >
+              {judging ? 'Judging...' : 'Judge Trace'}
+            </Button>
+          </div>
+
+          {judgeError && (
+            <p className="text-xs text-red-500 dark:text-red-300">{judgeError}</p>
+          )}
+
+          {judgment && (
+            <div className="text-sm text-foreground dark:text-gray-100 whitespace-pre-wrap border border-gray-200 dark:border-gray-700 rounded-md p-3 bg-white dark:bg-gray-900/30">
+              {judgment}
+            </div>
+          )}
+
         </div>
       )}
     </div>

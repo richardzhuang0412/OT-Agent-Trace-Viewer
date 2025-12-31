@@ -17,7 +17,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const hfService = new HfService(openAIHelper, judgeHelper, summaryHelper);
   const taskSummaryHelper = new TaskSummaryHelper(summaryHelper);
 
-  const traceService = new TraceService();
+  const traceService = new TraceService(openAIHelper);
   const taskService = new TaskService(hfService, taskSummaryHelper);
 
   // Health check endpoint for deployment verification
@@ -203,6 +203,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching trace:", error);
       res.status(500).json({ error: "Failed to fetch trace" });
+    }
+  });
+
+  app.post("/api/traces/:dataset/:runId/judge", async (req, res) => {
+    try {
+      const { dataset, runId } = req.params;
+
+      if (!dataset || !runId) {
+        return res.status(400).json({ error: "Missing dataset or runId parameter" });
+      }
+
+      const result = await traceService.judgeTrace(dataset, runId);
+      res.json(result);
+    } catch (error) {
+      console.error("Error generating trace judgment:", error);
+      res.status(500).json({ error: "Failed to generate judgment" });
     }
   });
 
