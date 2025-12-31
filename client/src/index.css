@@ -78,6 +78,23 @@
   border-radius: 3px;
 }
 
+.file-viewer--invalid {
+  border-color: hsl(var(--destructive));
+  background-color: hsla(0, 75%, 60%, 0.08);
+}
+
+.file-viewer__pre {
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+  overflow-x: auto;
+  white-space: pre-wrap;
+}
+
+.file-viewer__markdown {
+  max-height: 24rem;
+  overflow-y: auto;
+}
+
 .scrollbar-thin::-webkit-scrollbar-thumb:hover {
   background: hsl(220, 13%, 45%);
 }

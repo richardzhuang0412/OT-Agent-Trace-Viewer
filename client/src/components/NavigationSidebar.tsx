@@ -27,8 +27,16 @@ export default function NavigationSidebar({ onSelectTaskRun, selectedTaskRun }: 
   useEffect(() => {
     if (selectedTaskRun) {
       const { date, taskId } = selectedTaskRun;
-      setExpandedDates(prev => new Set([...prev, date]));
-      setExpandedTasks(prev => new Set([...prev, `${date}-${taskId}`]));
+      setExpandedDates(prev => {
+        const updated = new Set(prev);
+        updated.add(date);
+        return updated;
+      });
+      setExpandedTasks(prev => {
+        const updated = new Set(prev);
+        updated.add(`${date}-${taskId}`);
+        return updated;
+      });
     }
   }, [selectedTaskRun]);
 

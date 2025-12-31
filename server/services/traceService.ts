@@ -96,11 +96,14 @@ export class TraceService {
         this.datasetCache.set(dataset, allTraces);
       }
 
+      const unique = <T,>(items: T[]): T[] =>
+        items.filter((value, index, self) => self.indexOf(value) === index);
+
       const metadata: TraceMetadata = {
-        models: [...new Set(allTraces.map((t) => t.model))],
-        tasks: [...new Set(allTraces.map((t) => t.task))],
-        agents: [...new Set(allTraces.map((t) => t.agent))],
-        trial_names: [...new Set(allTraces.map((t) => t.trial_name))],
+        models: unique(allTraces.map((t) => t.model)),
+        tasks: unique(allTraces.map((t) => t.task)),
+        agents: unique(allTraces.map((t) => t.agent)),
+        trial_names: unique(allTraces.map((t) => t.trial_name)),
       };
 
       this.metadataCache.set(dataset, metadata);

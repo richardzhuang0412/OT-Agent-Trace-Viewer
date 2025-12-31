@@ -7,6 +7,7 @@ import { ChevronDown, ChevronRight, FileText, Loader2, AlertCircle } from 'lucid
 import { PaginationControls } from './PaginationControls';
 import type { TaskDetail } from '@shared/schema';
 import { useState } from 'react';
+import { FileViewer } from './FileViewer';
 
 interface TaskListViewerProps {
   tasks: TaskDetail[];
@@ -175,9 +176,14 @@ export function TaskListViewer({
                                         </div>
                                       </AccordionTrigger>
                                       <AccordionContent className="px-4 pb-4">
-                                        <pre className="bg-gray-900 dark:bg-gray-950 text-gray-100 p-4 rounded-md overflow-x-auto text-xs font-mono whitespace-pre-wrap break-words max-h-96 overflow-y-auto">
-                                          {file.content || '(No content)'}
-                                        </pre>
+                                        <FileViewer
+                                          file={{
+                                            name: file.path,
+                                            path: file.path,
+                                            size: file.size,
+                                            content: file.content ?? "",
+                                          }}
+                                        />
                                       </AccordionContent>
                                     </AccordionItem>
                                   ))}
