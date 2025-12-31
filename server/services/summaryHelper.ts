@@ -1,4 +1,7 @@
-import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
+import type {
+  ChatCompletionContentPart,
+  ChatCompletionMessageParam,
+} from "openai/resources/chat/completions";
 import { OpenAIHelper, type ChatOptions } from "./openAIHelper";
 
 interface SummaryOptions extends ChatOptions {
@@ -45,11 +48,34 @@ ${contextBlock}`;
       const response = await this.openAI.chat(messages, {
         ...options,
         responseFormat: "text",
-        maxCompletionTokens: options.maxCompletionTokens ?? 512,
-        temperature: options.temperature ?? 0.4,
+        maxCompletionTokens: options.maxCompletionTokens ?? 8192,
+        temperature: options.temperature,
+        reasoningEffort: options.reasoningEffort ?? "medium",
       });
 
-      const summary = response.choices[0].message.content?.trim() || "No summary generated.";
+      const firstChoice = response.choices?.[0];
+      const rawContent = firstChoice?.message?.content;
+      const extracted = extractMessageText(rawContent);
+
+      if (!extracted) {
+        const choicePreview = truncateString(JSON.stringify(firstChoice ?? {}, null, 2), 2000);
+        console.warn(
+          "[SummaryHelper] Empty summary content from OpenAI",
+          JSON.stringify({
+            finishReason: firstChoice?.finish_reason,
+            hasRefusal: Boolean(firstChoice?.message?.refusal),
+            contentTypes: Array.isArray(rawContent) ? rawContent.map((part) => part?.type) : typeof rawContent,
+          }),
+        );
+        console.warn("[SummaryHelper] Raw choice preview:", choicePreview);
+        const responsePreview = truncateString(JSON.stringify(response, null, 2), 4000);
+        console.warn("[SummaryHelper] Full response preview:", responsePreview);
+      }
+
+      const summary =
+        extracted ||
+        (typeof firstChoice?.message?.refusal === "string" ? firstChoice.message.refusal.trim() : "") ||
+        "No summary generated.";
       console.log(
         "[SummaryHelper] Summary generated",
         JSON.stringify({ length: summary.length, preview: summary.slice(0, 120) }),
@@ -60,4 +86,46 @@ ${contextBlock}`;
       throw error;
     }
   }
+}
+
+function extractMessageText(
+  content: string | ChatCompletionContentPart[] | null | undefined,
+): string {
+  if (!content) {
+    return "";
+  }
+
+  if (typeof content === "string") {
+    return content.trim();
+  }
+
+  if (Array.isArray(content)) {
+    return content
+      .map((part) => {
+        if (!part) {
+          return "";
+        }
+
+        if (typeof part === "string") {
+          return part;
+        }
+
+        if ("text" in part && typeof part.text === "string") {
+          return part.text;
+        }
+
+        return "";
+      })
+      .join("")
+      .trim();
+  }
+
+  return "";
+}
+
+function truncateString(value: string, length: number): string {
+  if (value.length <= length) {
+    return value;
+  }
+  return `${value.slice(0, length)}…[truncated]`;
 }

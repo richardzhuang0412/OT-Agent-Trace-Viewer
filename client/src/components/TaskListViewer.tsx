@@ -95,7 +95,7 @@ export function TaskListViewer({
     <Card className="bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800">
       <CardHeader>
         <CardTitle className="text-foreground dark:text-white">
-          Tasks ({totalItems} total)
+          Tasks ({tasks.length} shown, {totalItems} total)
         </CardTitle>
       </CardHeader>
       <CardContent>

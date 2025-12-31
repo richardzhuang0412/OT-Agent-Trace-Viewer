@@ -6,6 +6,7 @@ export interface ChatOptions {
   temperature?: number;
   responseFormat?: 'text' | 'json_object';
   maxCompletionTokens?: number;
+  reasoningEffort?: 'minimal' | 'low' | 'medium' | 'high';
 }
 
 const DEFAULT_MODEL = 'gpt-5-nano';
@@ -26,9 +27,10 @@ export class OpenAIHelper {
     return this.client.chat.completions.create({
       model: options.model || DEFAULT_MODEL,
       messages,
-      temperature: options.temperature ?? 0,
       response_format: options.responseFormat ? { type: options.responseFormat } : undefined,
       max_completion_tokens: options.maxCompletionTokens,
+      reasoning_effort: options.reasoningEffort,
+      ...(options.temperature !== undefined ? { temperature: options.temperature } : {}),
     });
   }
 }

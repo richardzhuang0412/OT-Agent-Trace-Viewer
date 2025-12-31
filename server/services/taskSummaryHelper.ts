@@ -33,7 +33,8 @@ export class TaskSummaryHelper {
         customPrompt,
         context,
         model: options?.model || "gpt-5-mini",
-        maxCompletionTokens: 800,
+        maxCompletionTokens: 8192,
+        reasoningEffort: "medium",
       });
 
       console.log(

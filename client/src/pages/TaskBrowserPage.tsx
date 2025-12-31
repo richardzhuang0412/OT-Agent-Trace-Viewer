@@ -3,7 +3,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { useClearTaskCache, useTaskList } from '@/hooks/useTasks';
-import { ArrowLeft, ExternalLink, RefreshCw } from 'lucide-react';
+import { getRandomTaskPage } from '@/lib/taskSampler';
+import { ArrowLeft, ExternalLink, RefreshCw, Shuffle } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useParams } from 'wouter';
 
@@ -52,6 +53,15 @@ export default function TaskBrowserPage() {
     clearCache(datasetId);
   };
 
+  const handleResample = () => {
+    if (!taskData?.total) {
+      return;
+    }
+    const randomPage = getRandomTaskPage(taskData.total, pageSize);
+    setPage(randomPage);
+    clearCache(datasetId);
+  };
+
   // Calculate total pages
   const totalPages = useMemo(() => {
     if (!taskData || taskData.total === 0) return 0;
@@ -88,6 +98,16 @@ export default function TaskBrowserPage() {
             >
               <RefreshCw className={`h-4 w-4 ${isLoadingTasks ? 'animate-spin' : ''}`} />
               Refresh
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleResample}
+              disabled={isLoadingTasks || !taskData?.total}
+              className="gap-2"
+            >
+              <Shuffle className="h-4 w-4" />
+              Resample
             </Button>
             <Button
               variant="outline"
