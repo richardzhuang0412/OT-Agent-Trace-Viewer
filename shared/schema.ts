@@ -229,6 +229,8 @@ export const taskListResponseSchema = z.object({
   tasks: z.array(taskDetailSchema),
   total: z.number(),
   nextOffset: z.number().optional(),
+  summary: z.string().optional(),
+  summaryError: z.string().optional(),
 });
 
 export type ExtractedFile = z.infer<typeof extractedFileSchema>;

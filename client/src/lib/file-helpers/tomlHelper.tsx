@@ -1,8 +1,7 @@
-import { Highlight, type Language, themes } from "prism-react-renderer";
-import Prism from "prismjs";
-import "prismjs/components/prism-toml";
+import type { Language } from "prism-react-renderer";
 import { parse, stringify } from "smol-toml";
 import type { FileDescriptor, FileRenderContext, FileTypeHelper, FileValidationResult } from "./types";
+import { renderHighlightedCode } from "./highlight";
 
 const TOML_LANGUAGE: Language = "toml";
 
@@ -41,38 +40,7 @@ class TomlHelper implements FileTypeHelper {
 
   render(descriptor: FileDescriptor, ctx?: FileRenderContext) {
     const content = getFormattedToml(descriptor.content);
-    const theme =
-      ctx?.theme === "light" ? themes.github : themes.nightOwl;
-
-    return (
-      <Highlight
-        prism={Prism as any}
-        code={content}
-        theme={theme}
-        language={TOML_LANGUAGE}
-      >
-        {({ className, style, tokens, getLineProps, getTokenProps }) => (
-          <pre
-            className={`file-viewer__pre ${className}`}
-            style={{
-              ...style,
-              backgroundColor: "var(--card)",
-              color: "var(--foreground)",
-              borderRadius: "0.5rem",
-              padding: "1rem",
-            }}
-          >
-            {tokens.map((line, i) => (
-              <div key={i} {...getLineProps({ line })}>
-                {line.map((token, key) => (
-                  <span key={key} {...getTokenProps({ token })} />
-                ))}
-              </div>
-            ))}
-          </pre>
-        )}
-      </Highlight>
-    );
+    return renderHighlightedCode(content, TOML_LANGUAGE, ctx);
   }
 }
 

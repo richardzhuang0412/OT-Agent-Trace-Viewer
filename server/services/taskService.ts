@@ -2,14 +2,15 @@ import * as tar from 'tar';
 import { Readable } from 'stream';
 import type { ExtractedFile, TaskDetail, TaskListResponse } from '@shared/schema';
 import { HfService } from './hfService';
+import { TaskSummaryHelper } from './taskSummaryHelper';
 
 export class TaskService {
-  private hfService: HfService;
   private taskCache: Map<string, TaskDetail[]> = new Map();
 
-  constructor() {
-    this.hfService = new HfService();
-  }
+  constructor(
+    private hfService: HfService = new HfService(),
+    private taskSummaryHelper?: TaskSummaryHelper,
+  ) {}
 
   /**
    * List tasks from a HuggingFace dataset with pagination
@@ -27,10 +28,26 @@ export class TaskService {
       // In a real implementation, you'd get this from the HF API response
       const total = offset + tasks.length + (tasks.length === limit ? 1 : 0);
 
+      let summary: string | undefined;
+      let summaryError: string | undefined;
+      if (this.taskSummaryHelper) {
+        try {
+          summary = await this.taskSummaryHelper.generateDatasetSummary(dataset, tasks, {
+            model: process.env.TASK_SUMMARY_MODEL || "gpt-5-mini",
+          });
+        } catch (error: any) {
+          summaryError = error?.message || 'Unable to generate summary';
+          summary = 'Summary not available.';
+          console.error('[TaskService] Summary generation failed:', error);
+        }
+      }
+
       return {
         tasks,
         total,
         nextOffset: tasks.length === limit ? offset + limit : undefined,
+        summary,
+        summaryError,
       };
     } catch (error) {
       console.error('[TaskService] Error listing tasks:', error);

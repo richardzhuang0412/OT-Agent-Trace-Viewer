@@ -1,16 +1,24 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { S3Service } from "./services/s3Service";
-
 import { TraceService } from "./services/traceService";
 import { TaskService } from "./services/taskService";
+import { OpenAIHelper } from "./services/openAIHelper";
+import { SummaryHelper } from "./services/summaryHelper";
+import { JudgeHelper } from "./services/judgeHelper";
+import { TaskSummaryHelper } from "./services/taskSummaryHelper";
+import { HfService } from "./services/hfService";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   const s3Service = new S3Service();
+  const openAIHelper = new OpenAIHelper();
+  const summaryHelper = new SummaryHelper(openAIHelper);
+  const judgeHelper = new JudgeHelper(openAIHelper);
+  const hfService = new HfService(openAIHelper, judgeHelper, summaryHelper);
+  const taskSummaryHelper = new TaskSummaryHelper(summaryHelper);
 
   const traceService = new TraceService();
-
-  const taskService = new TaskService();
+  const taskService = new TaskService(hfService, taskSummaryHelper);
 
   // Health check endpoint for deployment verification
   app.get("/api/health", (_req, res) => {

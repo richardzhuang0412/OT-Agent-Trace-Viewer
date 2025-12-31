@@ -1,8 +1,10 @@
 import { TaskListViewer } from '@/components/TaskListViewer';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useToast } from '@/hooks/use-toast';
 import { useClearTaskCache, useTaskList } from '@/hooks/useTasks';
 import { ArrowLeft, ExternalLink, RefreshCw } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useParams } from 'wouter';
 
 export default function TaskBrowserPage() {
@@ -22,6 +24,17 @@ export default function TaskBrowserPage() {
     isLoading: isLoadingTasks,
     error: tasksError,
   } = useTaskList(datasetId, pageSize, offset);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    if (taskData?.summaryError) {
+      toast({
+        title: 'Task dataset summary unavailable',
+        description: taskData.summaryError,
+        variant: 'destructive',
+      });
+    }
+  }, [taskData?.summaryError, toast]);
 
   // Cache clearing
   const { mutate: clearCache } = useClearTaskCache();
@@ -94,6 +107,20 @@ export default function TaskBrowserPage() {
             Dataset: <code className="font-mono text-sm">{datasetId}</code>
           </p>
         </div>
+
+        {/* Task Summary */}
+        {taskData?.summary && (
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle>Task Dataset Overview</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm whitespace-pre-wrap text-muted-foreground">
+                {taskData.summary}
+              </p>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Task List */}
         <TaskListViewer
