@@ -1,8 +1,11 @@
 import { TaskListViewer } from '@/components/TaskListViewer';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useToast } from '@/hooks/use-toast';
 import { useClearTaskCache, useTaskList } from '@/hooks/useTasks';
-import { ArrowLeft, ExternalLink, RefreshCw } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { getRandomTaskPage } from '@/lib/taskSampler';
+import { ArrowLeft, ExternalLink, RefreshCw, Shuffle } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useParams } from 'wouter';
 
 export default function TaskBrowserPage() {
@@ -22,6 +25,17 @@ export default function TaskBrowserPage() {
     isLoading: isLoadingTasks,
     error: tasksError,
   } = useTaskList(datasetId, pageSize, offset);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    if (taskData?.summaryError) {
+      toast({
+        title: 'Task dataset summary unavailable',
+        description: taskData.summaryError,
+        variant: 'destructive',
+      });
+    }
+  }, [taskData?.summaryError, toast]);
 
   // Cache clearing
   const { mutate: clearCache } = useClearTaskCache();
@@ -36,6 +50,15 @@ export default function TaskBrowserPage() {
   };
 
   const handleRefresh = () => {
+    clearCache(datasetId);
+  };
+
+  const handleResample = () => {
+    if (!taskData?.total) {
+      return;
+    }
+    const randomPage = getRandomTaskPage(taskData.total, pageSize);
+    setPage(randomPage);
     clearCache(datasetId);
   };
 
@@ -79,6 +102,16 @@ export default function TaskBrowserPage() {
             <Button
               variant="outline"
               size="sm"
+              onClick={handleResample}
+              disabled={isLoadingTasks || !taskData?.total}
+              className="gap-2"
+            >
+              <Shuffle className="h-4 w-4" />
+              Resample
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
               onClick={() => window.open(`https://huggingface.co/datasets/${datasetId}`, '_blank')}
               className="gap-2"
             >
@@ -94,6 +127,20 @@ export default function TaskBrowserPage() {
             Dataset: <code className="font-mono text-sm">{datasetId}</code>
           </p>
         </div>
+
+        {/* Task Summary */}
+        {taskData?.summary && (
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle>Task Dataset Overview</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm whitespace-pre-wrap text-muted-foreground">
+                {taskData.summary}
+              </p>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Task List */}
         <TaskListViewer

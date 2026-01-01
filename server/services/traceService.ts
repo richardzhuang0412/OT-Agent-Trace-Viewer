@@ -2,7 +2,10 @@ import axios from 'axios';
 import type {
   AtifTrace,
   AtifTurn,
+  EvalBenchmark,
   ParsedTurn,
+  TraceDatasetKind,
+  TraceDatasetInfo,
   TraceFilterParams,
   TraceListResponse,
   TraceMetadata,
@@ -10,14 +13,25 @@ import type {
 } from '@shared/schema';
 import { atifTraceSchema, traceFilterParamsSchema, traceListResponseSchema } from '@shared/schema';
 import { HfService } from './hfService';
+import type { ChatCompletionMessageParam } from 'openai/resources/chat/completions';
+import { OpenAIHelper } from './openAIHelper';
+
+const EVAL_BENCHMARKS: { key: EvalBenchmark; slug: string; label: string }[] = [
+  { key: 'dev_set_71_tasks', slug: 'dev_set_71_tasks', label: 'Dev Set 71 Tasks' },
+  { key: 'terminal_bench_2', slug: 'terminal_bench_2', label: 'Terminal Bench 2' },
+  { key: 'swebench-verified-random-100-folders', slug: 'swebench-verified-random-100-folders', label: 'SWE-bench Verified 100' },
+];
 
 export class TraceService {
   private hfService: HfService;
   private datasetCache: Map<string, AtifTrace[]> = new Map();
   private metadataCache: Map<string, TraceMetadata> = new Map();
+  private datasetInfoCache: Map<string, TraceDatasetInfo> = new Map();
+  private openAIHelper?: OpenAIHelper;
 
-  constructor() {
+  constructor(openAIHelper?: OpenAIHelper) {
     this.hfService = new HfService();
+    this.openAIHelper = openAIHelper;
   }
 
   /**
@@ -47,10 +61,13 @@ export class TraceService {
       // Apply pagination
       const paginatedTraces = filtered.slice(offset, offset + limit);
 
+      const datasetInfo = this.getDatasetInfo(dataset, allTraces);
+
       return {
         traces: paginatedTraces,
         total,
         nextOffset: offset + limit < total ? offset + limit : undefined,
+        dataset_info: datasetInfo,
       };
     } catch (error) {
       console.error('[TraceService] Error listing traces:', error);
@@ -79,6 +96,44 @@ export class TraceService {
     }
   }
 
+  async judgeTrace(dataset: string, runId: string): Promise<{ analysis: string }> {
+    if (!this.openAIHelper) {
+      throw new Error('OpenAI helper is not configured');
+    }
+
+    const trace = await this.getTrace(dataset, runId);
+    if (!trace) {
+      throw new Error('Trace not found');
+    }
+
+    const prompt = this.buildJudgePrompt(trace);
+    const messages: ChatCompletionMessageParam[] = [
+      {
+        role: 'system',
+        content:
+          'You are an expert evaluation judge for agent traces. Provide clear, actionable reasoning about success or failure.',
+      },
+      {
+        role: 'user',
+        content: prompt,
+      },
+    ];
+
+    const response = await this.openAIHelper.chat(messages, {
+      model:
+        process.env.TRACE_JUDGE_MODEL ||
+        process.env.TASK_SUMMARY_MODEL ||
+        'gpt-5-mini',
+      maxCompletionTokens: 8192,
+      reasoningEffort: 'medium',
+    });
+
+    const content = response.choices[0]?.message?.content?.trim();
+    return {
+      analysis: content || 'No analysis generated.',
+    };
+  }
+
   /**
    * Get metadata about traces (distinct values for filtering)
    */
@@ -96,11 +151,16 @@ export class TraceService {
         this.datasetCache.set(dataset, allTraces);
       }
 
+      const unique = <T,>(items: T[]): T[] =>
+        items.filter((value, index, self) => self.indexOf(value) === index);
+
       const metadata: TraceMetadata = {
-        models: [...new Set(allTraces.map((t) => t.model))],
-        tasks: [...new Set(allTraces.map((t) => t.task))],
-        agents: [...new Set(allTraces.map((t) => t.agent))],
-        trial_names: [...new Set(allTraces.map((t) => t.trial_name))],
+        models: unique(allTraces.map((t) => t.model)),
+        tasks: unique(allTraces.map((t) => t.task)),
+        agents: unique(allTraces.map((t) => t.agent)),
+        trial_names: unique(allTraces.map((t) => t.trial_name)),
+        results: unique(allTraces.map((t) => this.stringifyResult(t.result))),
+        dataset_info: this.getDatasetInfo(dataset, allTraces),
       };
 
       this.metadataCache.set(dataset, metadata);
@@ -118,10 +178,12 @@ export class TraceService {
     if (dataset) {
       this.datasetCache.delete(dataset);
       this.metadataCache.delete(dataset);
+      this.datasetInfoCache.delete(dataset);
       console.log('[TraceService] Cache cleared for dataset:', dataset);
     } else {
       this.datasetCache.clear();
       this.metadataCache.clear();
+      this.datasetInfoCache.clear();
       console.log('[TraceService] All caches cleared');
     }
   }
@@ -199,6 +261,10 @@ export class TraceService {
       // Handle nested structure - sometimes the trace data is nested under a 'trace' key
       const data = rowData.trace || rowData;
 
+      if (typeof data?.trace_source === 'string' && data.trace_source !== 'main') {
+        return null;
+      }
+
       // Validate against schema
       const trace = atifTraceSchema.parse(data);
       return trace;
@@ -211,6 +277,153 @@ export class TraceService {
   /**
    * Private: Apply filters to traces
    */
+  private getDatasetInfo(dataset: string, traces?: AtifTrace[]): TraceDatasetInfo {
+    const cached = this.datasetInfoCache.get(dataset);
+    if (cached && !traces) {
+      return cached;
+    }
+
+    let sourceTraces = traces;
+    if (!sourceTraces) {
+      sourceTraces = this.datasetCache.get(dataset);
+    }
+
+    const info = this.classifyDataset(dataset, sourceTraces ?? []);
+    this.datasetInfoCache.set(dataset, info);
+    return info;
+  }
+
+  private classifyDataset(dataset: string, traces: AtifTrace[]): TraceDatasetInfo {
+    const segments = dataset.split('/');
+    const repository = segments.pop() ?? dataset;
+    const namespace = segments.length ? segments.join('/') : undefined;
+    const normalizedRepo = repository.toLowerCase();
+
+    const baseInfo: TraceDatasetInfo = {
+      dataset,
+      namespace,
+      repository,
+      kind: 'training',
+    };
+
+    const looksEval =
+      normalizedRepo.startsWith('dcagent_') && /[0-9a-f]+$/.test(normalizedRepo);
+
+    if (looksEval) {
+      const benchmarkMatch = this.findBenchmark(normalizedRepo);
+      if (benchmarkMatch) {
+        const enriched = this.computeEvalDetails(traces);
+        return {
+          ...baseInfo,
+          kind: 'eval',
+          benchmark: benchmarkMatch.key,
+          ...(enriched && {
+            score: enriched.score,
+            successful_tasks: enriched.successfulTasks,
+          }),
+        };
+      }
+
+      return {
+        ...baseInfo,
+        warning: 'Dataset name matches DCAgent_* pattern but benchmark slug is unrecognized. Treating as training.',
+      };
+    }
+
+    return baseInfo;
+  }
+
+  private findBenchmark(repoName: string): { key: EvalBenchmark; slug: string; label: string } | undefined {
+    return EVAL_BENCHMARKS.find(({ slug }) => repoName.includes(slug));
+  }
+
+  private computeEvalDetails(traces: AtifTrace[] | undefined) {
+    if (!traces || traces.length === 0) {
+      return null;
+    }
+
+    const total = traces.length;
+    let earned = 0;
+    const successfulTasks = new Set<string>();
+
+    for (const trace of traces) {
+      const reward = this.getRewardValue(trace.result);
+      if (reward > 0) {
+        successfulTasks.add(trace.task);
+      }
+      earned += reward;
+    }
+
+    return {
+      score: {
+        earned,
+        total,
+      },
+      successfulTasks: Array.from(successfulTasks).sort(),
+    };
+  }
+
+  private buildJudgePrompt(trace: AtifTrace): string {
+    const resultText =
+      trace.result !== undefined
+        ? typeof trace.result === 'string'
+          ? trace.result
+          : trace.result.toString()
+        : 'Unknown';
+
+    const conversation = trace.conversations
+      .map(
+        (turn, idx) =>
+          `Turn ${idx + 1} — ${turn.role.toUpperCase()}:\n${turn.content}`,
+      )
+      .join('\n\n');
+
+    return `Analyze the following agent trace and explain why it ${
+      this.getRewardValue(trace.result) > 0 ? 'succeeded' : 'failed'
+    }.
+
+Dataset metadata:
+- Run ID: ${trace.run_id}
+- Task: ${trace.task}
+- Agent: ${trace.agent}
+- Model: ${trace.model}
+- Result (reward or outcome): ${resultText}
+
+Provide:
+1. A concise verdict stating whether the run was a success or failure.
+2. Key evidence from the dialogue supporting that verdict.
+3. The primary reasons for the outcome (strategy, tooling, errors, etc.).
+4. Concrete guidance on how to improve the run if it failed.
+
+FULL CONVERSATION:
+${conversation}`;
+  }
+
+  private getRewardValue(result: unknown): number {
+    if (typeof result === 'number' && Number.isFinite(result)) {
+      return result;
+    }
+
+    if (typeof result === 'string') {
+      const parsed = parseFloat(result);
+      if (!Number.isNaN(parsed) && Number.isFinite(parsed)) {
+        return parsed;
+      }
+    }
+
+    return 0;
+  }
+
+  private stringifyResult(result: unknown): string {
+    if (result === undefined || result === null) {
+      return 'N/A';
+    }
+    if (typeof result === 'number') {
+      return Number.isFinite(result) ? result.toString() : 'NaN';
+    }
+    return String(result);
+  }
+
   private applyFilters(traces: AtifTrace[], filters: Partial<TraceFilterParams>): AtifTrace[] {
     return traces.filter((trace) => {
       if (filters.run_id && !trace.run_id.includes(filters.run_id)) {

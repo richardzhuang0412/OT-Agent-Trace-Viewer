@@ -163,6 +163,9 @@ export const atifTraceSchema = z.object({
   episode: z.union([z.string(), z.number()]),
   run_id: z.string(),
   trial_name: z.string(),
+  tool_definitions: z.any().optional(),
+  result: z.union([z.number(), z.string()]).optional(),
+  trace_source: z.string().optional(),
 
   // Conversation data
   conversations: z.array(atifTurnSchema),
@@ -190,11 +193,36 @@ export const traceFilterParamsSchema = z.object({
   offset: z.number().optional().default(0),
 });
 
+export const evalBenchmarkSchema = z.enum([
+  'dev_set_71_tasks',
+  'terminal_bench_2',
+  'swebench-verified-random-100-folders',
+]);
+
+export const traceDatasetKindSchema = z.enum(['training', 'eval']);
+
+export const traceDatasetInfoSchema = z.object({
+  dataset: z.string(),
+  namespace: z.string().optional(),
+  repository: z.string(),
+  kind: traceDatasetKindSchema,
+  benchmark: evalBenchmarkSchema.optional(),
+  warning: z.string().optional(),
+  score: z
+    .object({
+      earned: z.number(),
+      total: z.number(),
+    })
+    .optional(),
+  successful_tasks: z.array(z.string()).optional(),
+});
+
 // Response for trace list endpoint
 export const traceListResponseSchema = z.object({
   traces: z.array(atifTraceSchema),
   total: z.number(),
   nextOffset: z.number().optional(),
+  dataset_info: traceDatasetInfoSchema,
 });
 
 // Metadata for filter dropdowns/options
@@ -203,6 +231,8 @@ export const traceMetadataSchema = z.object({
   tasks: z.array(z.string()),
   agents: z.array(z.string()),
   trial_names: z.array(z.string()),
+  results: z.array(z.string()).optional(),
+  dataset_info: traceDatasetInfoSchema,
 });
 
 export type AtifTurn = z.infer<typeof atifTurnSchema>;
@@ -211,6 +241,9 @@ export type ParsedTurn = z.infer<typeof parsedTurnSchema>;
 export type TraceFilterParams = z.infer<typeof traceFilterParamsSchema>;
 export type TraceListResponse = z.infer<typeof traceListResponseSchema>;
 export type TraceMetadata = z.infer<typeof traceMetadataSchema>;
+export type EvalBenchmark = z.infer<typeof evalBenchmarkSchema>;
+export type TraceDatasetInfo = z.infer<typeof traceDatasetInfoSchema>;
+export type TraceDatasetKind = z.infer<typeof traceDatasetKindSchema>;
 
 // Task dataset schemas for HuggingFace task parquet datasets
 export const extractedFileSchema = z.object({
@@ -229,6 +262,8 @@ export const taskListResponseSchema = z.object({
   tasks: z.array(taskDetailSchema),
   total: z.number(),
   nextOffset: z.number().optional(),
+  summary: z.string().optional(),
+  summaryError: z.string().optional(),
 });
 
 export type ExtractedFile = z.infer<typeof extractedFileSchema>;

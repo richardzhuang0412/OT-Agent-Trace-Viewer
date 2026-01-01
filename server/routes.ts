@@ -1,16 +1,24 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { S3Service } from "./services/s3Service";
-
 import { TraceService } from "./services/traceService";
 import { TaskService } from "./services/taskService";
+import { OpenAIHelper } from "./services/openAIHelper";
+import { SummaryHelper } from "./services/summaryHelper";
+import { JudgeHelper } from "./services/judgeHelper";
+import { TaskSummaryHelper } from "./services/taskSummaryHelper";
+import { HfService } from "./services/hfService";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   const s3Service = new S3Service();
+  const openAIHelper = new OpenAIHelper();
+  const summaryHelper = new SummaryHelper(openAIHelper);
+  const judgeHelper = new JudgeHelper(openAIHelper);
+  const hfService = new HfService(openAIHelper, judgeHelper, summaryHelper);
+  const taskSummaryHelper = new TaskSummaryHelper(summaryHelper);
 
-  const traceService = new TraceService();
-
-  const taskService = new TaskService();
+  const traceService = new TraceService(openAIHelper);
+  const taskService = new TaskService(hfService, taskSummaryHelper);
 
   // Health check endpoint for deployment verification
   app.get("/api/health", (_req, res) => {
@@ -195,6 +203,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching trace:", error);
       res.status(500).json({ error: "Failed to fetch trace" });
+    }
+  });
+
+  app.post("/api/traces/:dataset/:runId/judge", async (req, res) => {
+    try {
+      const { dataset, runId } = req.params;
+
+      if (!dataset || !runId) {
+        return res.status(400).json({ error: "Missing dataset or runId parameter" });
+      }
+
+      const result = await traceService.judgeTrace(dataset, runId);
+      res.json(result);
+    } catch (error) {
+      console.error("Error generating trace judgment:", error);
+      res.status(500).json({ error: "Failed to generate judgment" });
     }
   });
 

@@ -2,14 +2,15 @@ import * as tar from 'tar';
 import { Readable } from 'stream';
 import type { ExtractedFile, TaskDetail, TaskListResponse } from '@shared/schema';
 import { HfService } from './hfService';
+import { TaskSummaryHelper } from './taskSummaryHelper';
 
 export class TaskService {
-  private hfService: HfService;
   private taskCache: Map<string, TaskDetail[]> = new Map();
 
-  constructor() {
-    this.hfService = new HfService();
-  }
+  constructor(
+    private hfService: HfService = new HfService(),
+    private taskSummaryHelper?: TaskSummaryHelper,
+  ) {}
 
   /**
    * List tasks from a HuggingFace dataset with pagination
@@ -21,16 +22,33 @@ export class TaskService {
       console.log(`[TaskService] Pagination: limit=${limit}, offset=${offset}`);
 
       // Fetch only the requested page directly from HuggingFace
-      const tasks = await this.fetchPagedTasks(dataset, limit, offset);
+      const { tasks, totalRows } = await this.fetchPagedTasks(dataset, limit, offset);
 
-      // For now, we assume total is at least offset + tasks.length
-      // In a real implementation, you'd get this from the HF API response
-      const total = offset + tasks.length + (tasks.length === limit ? 1 : 0);
+      // Prefer the HuggingFace-reported total row count when available
+      const total = typeof totalRows === 'number'
+        ? totalRows
+        : offset + tasks.length + (tasks.length === limit ? 1 : 0);
+
+      let summary: string | undefined;
+      let summaryError: string | undefined;
+      if (this.taskSummaryHelper) {
+        try {
+          summary = await this.taskSummaryHelper.generateDatasetSummary(dataset, tasks, {
+            model: process.env.TASK_SUMMARY_MODEL || "gpt-5-mini",
+          });
+        } catch (error: any) {
+          summaryError = error?.message || 'Unable to generate summary';
+          summary = 'Summary not available.';
+          console.error('[TaskService] Summary generation failed:', error);
+        }
+      }
 
       return {
         tasks,
         total,
         nextOffset: tasks.length === limit ? offset + limit : undefined,
+        summary,
+        summaryError,
       };
     } catch (error) {
       console.error('[TaskService] Error listing tasks:', error);
@@ -54,16 +72,22 @@ export class TaskService {
   /**
    * Private: Fetch a single page of tasks from HuggingFace dataset
    */
-  private async fetchPagedTasks(dataset: string, limit: number, offset: number): Promise<TaskDetail[]> {
+  private async fetchPagedTasks(
+    dataset: string,
+    limit: number,
+    offset: number,
+  ): Promise<{ tasks: TaskDetail[]; totalRows?: number }> {
     const tasks: TaskDetail[] = [];
+    let totalRows: number | undefined;
 
     try {
       console.log(`[TaskService] Fetching single page at offset ${offset}, limit ${limit}`);
       const response = await this.hfService.getDatasetRows(dataset, 'default', 'train', offset, limit);
+      totalRows = response.num_rows_total;
 
       if (!response.rows || response.rows.length === 0) {
         console.log('[TaskService] No rows found');
-        return tasks;
+        return { tasks, totalRows };
       }
 
       // Process each row
@@ -91,7 +115,7 @@ export class TaskService {
       }
 
       console.log(`[TaskService] Successfully processed ${tasks.length} tasks from this page`);
-      return tasks;
+      return { tasks, totalRows };
     } catch (error) {
       console.error('[TaskService] Error fetching paged tasks:', error);
       if (error instanceof Error) {

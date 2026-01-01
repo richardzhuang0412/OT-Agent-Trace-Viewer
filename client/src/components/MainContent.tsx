@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ChevronRight, Download, Play, BarChart3, Terminal, FileCode, Search, Bug, AlertTriangle, CheckCircle, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,8 @@ import TerminalViewer from "@/components/TerminalViewer";
 import JsonTableViewer from "@/components/JsonTableViewer";
 import TaskQualityAssessment from "@/components/TaskQualityAssessment";
 import { TaskRun } from "@shared/schema";
+import { FileViewer } from "@/components/FileViewer";
+import { dump as yamlDump } from "js-yaml";
 
 interface MainContentProps {
   selectedTaskRun: { date: string; taskId: string; modelName: string } | null;
@@ -98,6 +100,20 @@ export default function MainContent({ selectedTaskRun }: MainContentProps) {
     link.click();
     document.body.removeChild(link);
   };
+
+  const taskYamlContent = useMemo(() => {
+    if (!taskRun?.taskYaml) return undefined;
+    try {
+      return yamlDump(taskRun.taskYaml);
+    } catch {
+      return JSON.stringify(taskRun.taskYaml, null, 2);
+    }
+  }, [taskRun?.taskYaml]);
+
+  const resultsJsonContent = useMemo(() => {
+    if (!taskRun?.resultsJson) return undefined;
+    return JSON.stringify(taskRun.resultsJson, null, 2);
+  }, [taskRun?.resultsJson]);
 
   if (!selectedTaskRun) {
     return (
@@ -438,7 +454,7 @@ export default function MainContent({ selectedTaskRun }: MainContentProps) {
           <TabsContent value="files" className="p-6 space-y-6 m-0">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* task.yaml */}
-              {taskRun.taskYaml && (
+              {taskYamlContent && (
                 <Card>
                   <CardHeader>
                     <div className="flex items-center justify-between">
@@ -454,17 +470,19 @@ export default function MainContent({ selectedTaskRun }: MainContentProps) {
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <div className="bg-muted rounded-lg p-4 max-h-96 overflow-y-auto scrollbar-thin">
-                      <pre className="text-sm font-mono text-foreground">
-                        {JSON.stringify(taskRun.taskYaml, null, 2)}
-                      </pre>
-                    </div>
+                    <FileViewer
+                      file={{
+                        name: "task.yaml",
+                        path: "task.yaml",
+                        content: taskYamlContent,
+                      }}
+                    />
                   </CardContent>
                 </Card>
               )}
 
               {/* results.json */}
-              {taskRun.resultsJson && (
+              {resultsJsonContent && (
                 <Card>
                   <CardHeader>
                     <div className="flex items-center justify-between">
@@ -480,11 +498,13 @@ export default function MainContent({ selectedTaskRun }: MainContentProps) {
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <div className="bg-muted rounded-lg p-4 max-h-96 overflow-y-auto scrollbar-thin">
-                      <pre className="text-sm font-mono text-foreground">
-                        {JSON.stringify(taskRun.resultsJson, null, 2)}
-                      </pre>
-                    </div>
+                    <FileViewer
+                      file={{
+                        name: "results.json",
+                        path: "results.json",
+                        content: resultsJsonContent,
+                      }}
+                    />
                   </CardContent>
                 </Card>
               )}
