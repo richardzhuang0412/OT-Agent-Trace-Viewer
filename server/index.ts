@@ -1,4 +1,5 @@
 import express, { type Request, Response, NextFunction } from "express";
+import session from "express-session";
 import compression from "compression";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
@@ -10,6 +11,19 @@ app.use(compression());
 
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: false, limit: '50mb' }));
+
+// Configure session middleware for API key storage
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'dev-secret-' + Math.random().toString(36),
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    maxAge: 24 * 60 * 60 * 1000, // 24 hours
+  },
+}));
 
 app.use((req, res, next) => {
   const start = Date.now();
@@ -47,21 +61,12 @@ app.use((req, res, next) => {
     console.log('Environment:', process.env.NODE_ENV || 'development');
     console.log('Port:', process.env.PORT || '5000');
     
-    // Verify critical environment variables
-    const requiredSecrets = ['OPENAI_API_KEY'];
-    const missingSecrets = requiredSecrets.filter(secret => !process.env[secret]);
-    
-    if (missingSecrets.length > 0) {
-      console.error('Missing required secrets:', missingSecrets.join(', '));
-      console.error('Application may not function correctly without these secrets');
-    }
-    
     // Log optional secrets status (don't fail if missing)
-    const optionalSecrets = ['SESSION_SECRET', 'AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY'];
+    const optionalSecrets = ['OPENAI_API_KEY', 'SESSION_SECRET', 'AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY'];
     const missingOptional = optionalSecrets.filter(secret => !process.env[secret]);
     if (missingOptional.length > 0) {
-      console.warn('Missing optional secrets:', missingOptional.join(', '));
-      console.warn('Some features may not work without these secrets');
+      console.info('Missing optional secrets:', missingOptional.join(', '));
+      console.info('Some features may require configuration. OPENAI_API_KEY can be configured per-session via Settings.');
     }
 
     console.log('Registering routes...');

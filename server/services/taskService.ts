@@ -16,7 +16,12 @@ export class TaskService {
    * List tasks from a HuggingFace dataset with pagination
    * NOTE: For now, we only fetch the requested page to avoid rate limits
    */
-  async listTasks(dataset: string, limit: number = 50, offset: number = 0): Promise<TaskListResponse> {
+  async listTasks(
+    dataset: string,
+    limit: number = 50,
+    offset: number = 0,
+    options?: { apiKey?: string; skipSummary?: boolean }
+  ): Promise<TaskListResponse> {
     try {
       console.log(`[TaskService] Fetching tasks from dataset: ${dataset}`);
       console.log(`[TaskService] Pagination: limit=${limit}, offset=${offset}`);
@@ -31,13 +36,21 @@ export class TaskService {
 
       let summary: string | undefined;
       let summaryError: string | undefined;
-      if (this.taskSummaryHelper) {
+
+      // Only generate summary if not skipped
+      if (!options?.skipSummary && this.taskSummaryHelper) {
         try {
           summary = await this.taskSummaryHelper.generateDatasetSummary(dataset, tasks, {
             model: process.env.TASK_SUMMARY_MODEL || "gpt-5-mini",
+            apiKey: options?.apiKey,
           });
         } catch (error: any) {
-          summaryError = error?.message || 'Unable to generate summary';
+          // Check if error is due to missing API key
+          if (error?.message === 'OPENAI_API_KEY_REQUIRED') {
+            summaryError = 'OPENAI_API_KEY_REQUIRED';
+          } else {
+            summaryError = error?.message || 'Unable to generate summary';
+          }
           summary = 'Summary not available.';
           console.error('[TaskService] Summary generation failed:', error);
         }
@@ -52,6 +65,55 @@ export class TaskService {
       };
     } catch (error) {
       console.error('[TaskService] Error listing tasks:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Generate summary for a dataset (separate endpoint for async loading)
+   */
+  async generateSummary(
+    dataset: string,
+    limit: number = 50,
+    offset: number = 0,
+    apiKey?: string
+  ): Promise<{ summary: string; summaryError?: string }> {
+    try {
+      console.log(`[TaskService] Generating summary for dataset: ${dataset}`);
+
+      // Fetch tasks for summary generation
+      const { tasks } = await this.fetchPagedTasks(dataset, limit, offset);
+
+      if (!this.taskSummaryHelper) {
+        return {
+          summary: 'Summary not available.',
+          summaryError: 'Summary helper not configured',
+        };
+      }
+
+      try {
+        const summary = await this.taskSummaryHelper.generateDatasetSummary(dataset, tasks, {
+          model: process.env.TASK_SUMMARY_MODEL || "gpt-5-mini",
+          apiKey,
+        });
+
+        return { summary };
+      } catch (error: any) {
+        let summaryError: string;
+        if (error?.message === 'OPENAI_API_KEY_REQUIRED') {
+          summaryError = 'OPENAI_API_KEY_REQUIRED';
+        } else {
+          summaryError = error?.message || 'Unable to generate summary';
+        }
+
+        console.error('[TaskService] Summary generation failed:', error);
+        return {
+          summary: 'Summary not available.',
+          summaryError,
+        };
+      }
+    } catch (error) {
+      console.error('[TaskService] Error generating summary:', error);
       throw error;
     }
   }

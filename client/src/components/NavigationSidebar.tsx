@@ -1,11 +1,13 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation, Link } from "wouter";
-import { Search, Filter, Calendar, Terminal, Bot, ChevronDown, ChevronRight, ExternalLink, Database } from "lucide-react";
+import { Search, Filter, Calendar, Terminal, Bot, ChevronDown, ChevronRight, ExternalLink, Database, Settings } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { S3Hierarchy } from "@shared/schema";
+import { useApiKeyStatus } from "@/hooks/useApiKeyStatus";
+import { ApiKeyConfigModal } from "./ApiKeyConfigModal";
 
 interface NavigationSidebarProps {
   onSelectTaskRun: (taskRun: { date: string; taskId: string; modelName: string }) => void;
@@ -18,6 +20,8 @@ export default function NavigationSidebar({ onSelectTaskRun, selectedTaskRun }: 
   const [difficultyFilter, setDifficultyFilter] = useState("all");
   const [expandedDates, setExpandedDates] = useState<Set<string>>(new Set());
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
+  const [showApiKeyModal, setShowApiKeyModal] = useState(false);
+  const { data: apiKeyStatus } = useApiKeyStatus();
 
   const { data: hierarchy, isLoading, error } = useQuery<S3Hierarchy>({
     queryKey: ["/api/hierarchy"],
@@ -245,7 +249,28 @@ export default function NavigationSidebar({ onSelectTaskRun, selectedTaskRun }: 
       </div>
 
       {/* Sidebar Footer */}
-      <div className="p-4 border-t border-border">
+      <div className="p-4 border-t border-border space-y-3">
+        {/* API Key Settings Button */}
+        <Button
+          variant="outline"
+          size="sm"
+          className="w-full"
+          onClick={() => setShowApiKeyModal(true)}
+        >
+          <Settings className="h-4 w-4 mr-2" />
+          <span className="flex-1 text-left">API Key Settings</span>
+          <div
+            className={`w-2 h-2 rounded-full ${
+              apiKeyStatus?.hasKey ? 'bg-green-500' : 'bg-gray-400'
+            }`}
+            title={
+              apiKeyStatus?.hasKey
+                ? `API key configured (${apiKeyStatus.source})`
+                : 'No API key configured'
+            }
+          />
+        </Button>
+
         <div className="flex items-center justify-between text-xs text-muted-foreground">
           <span>Connected to S3</span>
           <div className="flex items-center gap-1">
@@ -254,6 +279,12 @@ export default function NavigationSidebar({ onSelectTaskRun, selectedTaskRun }: 
           </div>
         </div>
       </div>
+
+      {/* API Key Configuration Modal */}
+      <ApiKeyConfigModal
+        open={showApiKeyModal}
+        onOpenChange={setShowApiKeyModal}
+      />
     </div>
   );
 }

@@ -269,3 +269,28 @@ export const taskListResponseSchema = z.object({
 export type ExtractedFile = z.infer<typeof extractedFileSchema>;
 export type TaskDetail = z.infer<typeof taskDetailSchema>;
 export type TaskListResponse = z.infer<typeof taskListResponseSchema>;
+
+// API Key Configuration Schemas
+export const ApiKeyStatusSchema = z.object({
+  hasKey: z.boolean(),
+  source: z.enum(['environment', 'session', 'none']),
+});
+
+export const ApiKeyConfigRequestSchema = z.object({
+  apiKey: z.string().min(10).startsWith('sk-'),
+});
+
+export const ApiKeyConfigResponseSchema = z.object({
+  success: z.boolean(),
+  source: z.enum(['session']),
+});
+
+export const ApiKeyErrorSchema = z.object({
+  error: z.literal('OPENAI_API_KEY_REQUIRED'),
+  message: z.string(),
+});
+
+export type ApiKeyStatus = z.infer<typeof ApiKeyStatusSchema>;
+export type ApiKeyConfigRequest = z.infer<typeof ApiKeyConfigRequestSchema>;
+export type ApiKeyConfigResponse = z.infer<typeof ApiKeyConfigResponseSchema>;
+export type ApiKeyError = z.infer<typeof ApiKeyErrorSchema>;

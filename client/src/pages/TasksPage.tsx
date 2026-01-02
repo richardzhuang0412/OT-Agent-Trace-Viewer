@@ -1,7 +1,7 @@
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Search, FolderOpen } from 'lucide-react';
+import { Search, FolderOpen, ArrowLeft } from 'lucide-react';
 import { useState } from 'react';
 import { useLocation } from 'wouter';
 
@@ -19,6 +19,15 @@ export default function TasksPage() {
     <div className="min-h-screen bg-background dark:bg-gray-950 p-8">
       <div className="max-w-4xl mx-auto">
         <div className="mb-8">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setLocation('/')}
+            className="mb-4 gap-2"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to Home
+          </Button>
           <h1 className="text-4xl font-bold text-foreground dark:text-white mb-2">
             Task Dataset Viewer
           </h1>

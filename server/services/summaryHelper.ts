@@ -7,12 +7,19 @@ import { OpenAIHelper, type ChatOptions } from "./openAIHelper";
 interface SummaryOptions extends ChatOptions {
   customPrompt?: string;
   context?: string;
+  apiKey?: string;
 }
 
 export class SummaryHelper {
   constructor(private readonly openAI: OpenAIHelper) {}
 
   async summarize(content: string, options: SummaryOptions = {}): Promise<string> {
+    // Use session API key if provided, otherwise use default helper
+    const helper = options.apiKey ? new OpenAIHelper({ apiKey: options.apiKey }) : this.openAI;
+
+    if (!helper) {
+      throw new Error('OPENAI_API_KEY_REQUIRED');
+    }
     const hasContext =
       (options.context && options.context.trim().length > 0) ||
       (content && content.trim().length > 0);
@@ -45,7 +52,7 @@ ${contextBlock}`;
     );
 
     try {
-      const response = await this.openAI.chat(messages, {
+      const response = await helper.chat(messages, {
         ...options,
         responseFormat: "text",
         maxCompletionTokens: options.maxCompletionTokens ?? 8192,

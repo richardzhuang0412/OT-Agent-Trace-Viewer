@@ -58,13 +58,13 @@ export default function TaskPage() {
     return (
       <div className="min-h-screen bg-background text-foreground p-8">
         <div className="max-w-4xl mx-auto">
-          <Button 
-            variant="ghost" 
-            onClick={() => setLocation('/')}
+          <Button
+            variant="ghost"
+            onClick={() => setLocation('/s3')}
             className="mb-4"
           >
             <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Overview
+            Back to S3 Viewer
           </Button>
           <div className="text-center text-muted-foreground">
             Task not found: {taskId} on {date}
@@ -80,13 +80,13 @@ export default function TaskPage() {
         
         {/* Header */}
         <div className="flex items-center gap-4">
-          <Button 
-            variant="ghost" 
-            onClick={() => setLocation('/')}
+          <Button
+            variant="ghost"
+            onClick={() => setLocation('/s3')}
             data-testid="button-back"
           >
             <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Overview
+            Back to S3 Viewer
           </Button>
           
           <div className="flex items-center gap-2">

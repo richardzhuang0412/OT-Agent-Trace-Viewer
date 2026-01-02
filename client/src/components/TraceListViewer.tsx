@@ -1,12 +1,23 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import type { AtifTrace } from '@shared/schema';
 import { ChevronDown, ChevronRight, Loader2 } from 'lucide-react';
 import { memo, useCallback, useState } from 'react';
 import type { MouseEvent } from 'react';
 import { ConversationViewer } from './ConversationViewer';
 import { PaginationControls } from './PaginationControls';
+import { ApiKeyConfigModal } from './ApiKeyConfigModal';
 
 interface TraceListViewerProps {
   traces: AtifTrace[];
@@ -189,10 +200,12 @@ const TraceRow = memo(function TraceRow({
   const [judging, setJudging] = useState(false);
   const [judgment, setJudgment] = useState<string | null>(null);
   const [judgeError, setJudgeError] = useState<string | null>(null);
+  const [showApiKeyAlert, setShowApiKeyAlert] = useState(false);
+  const [showApiKeyModal, setShowApiKeyModal] = useState(false);
 
   const handleJudge = useCallback(
-    async (event: MouseEvent<HTMLButtonElement>) => {
-      event.stopPropagation();
+    async (event?: MouseEvent<HTMLButtonElement>) => {
+      event?.stopPropagation();
       if (judging) return;
       setJudging(true);
       setJudgeError(null);
@@ -204,7 +217,12 @@ const TraceRow = memo(function TraceRow({
         );
         const data = await response.json().catch(() => ({}));
         if (!response.ok) {
-          throw new Error(data.error || 'Failed to generate judgment');
+          // Check if error is due to missing API key
+          if (data.error === 'OPENAI_API_KEY_REQUIRED') {
+            setShowApiKeyAlert(true);
+            return;
+          }
+          throw new Error(data.message || data.error || 'Failed to generate judgment');
         }
         setJudgment(data.analysis || 'No analysis generated.');
       } catch (error) {
@@ -216,6 +234,17 @@ const TraceRow = memo(function TraceRow({
     },
     [datasetId, judging, trace.run_id],
   );
+
+  const handleConfigureApiKey = useCallback(() => {
+    setShowApiKeyAlert(false);
+    setShowApiKeyModal(true);
+  }, []);
+
+  const handleApiKeyConfigured = useCallback(() => {
+    // Automatically retry the judge request after API key is configured
+    setShowApiKeyModal(false);
+    handleJudge();
+  }, [handleJudge]);
 
   const resultDisplay =
     trace.result === undefined || trace.result === null
@@ -338,6 +367,31 @@ const TraceRow = memo(function TraceRow({
 
         </div>
       )}
+
+      {/* API Key Required Alert */}
+      <AlertDialog open={showApiKeyAlert} onOpenChange={setShowApiKeyAlert}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>OpenAI API Key Required</AlertDialogTitle>
+            <AlertDialogDescription>
+              This feature requires an OpenAI API key to analyze traces. Would you like to configure one now?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfigureApiKey}>
+              Configure API Key
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* API Key Configuration Modal */}
+      <ApiKeyConfigModal
+        open={showApiKeyModal}
+        onOpenChange={setShowApiKeyModal}
+        onSuccess={handleApiKeyConfigured}
+      />
     </div>
   );
 });

@@ -96,9 +96,12 @@ export class TraceService {
     }
   }
 
-  async judgeTrace(dataset: string, runId: string): Promise<{ analysis: string }> {
-    if (!this.openAIHelper) {
-      throw new Error('OpenAI helper is not configured');
+  async judgeTrace(dataset: string, runId: string, apiKey?: string): Promise<{ analysis: string }> {
+    // Use session API key if provided, otherwise use default helper
+    const helper = apiKey ? new OpenAIHelper({ apiKey }) : this.openAIHelper;
+
+    if (!helper) {
+      throw new Error('OPENAI_API_KEY_REQUIRED');
     }
 
     const trace = await this.getTrace(dataset, runId);
@@ -119,7 +122,7 @@ export class TraceService {
       },
     ];
 
-    const response = await this.openAIHelper.chat(messages, {
+    const response = await helper.chat(messages, {
       model:
         process.env.TRACE_JUDGE_MODEL ||
         process.env.TASK_SUMMARY_MODEL ||

@@ -22,11 +22,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Health check endpoint for deployment verification
   app.get("/api/health", (_req, res) => {
-    res.json({ 
-      status: "ok", 
+    res.json({
+      status: "ok",
       timestamp: new Date().toISOString(),
       environment: process.env.NODE_ENV || "development"
     });
+  });
+
+  // API Key Configuration Endpoints
+
+  // Get OpenAI API key configuration status
+  app.get("/api/config/openai-status", (req, res) => {
+    const envKey = process.env.OPENAI_API_KEY;
+    const sessionKey = req.session.openaiApiKey;
+
+    if (envKey) {
+      res.json({ hasKey: true, source: 'environment' });
+    } else if (sessionKey) {
+      res.json({ hasKey: true, source: 'session' });
+    } else {
+      res.json({ hasKey: false, source: 'none' });
+    }
+  });
+
+  // Configure OpenAI API key for this session
+  app.post("/api/config/openai-key", async (req, res) => {
+    try {
+      const { apiKey } = req.body;
+
+      if (!apiKey || typeof apiKey !== 'string') {
+        return res.status(400).json({ error: 'API key is required' });
+      }
+
+      // Validate API key format
+      if (!apiKey.startsWith('sk-')) {
+        return res.status(400).json({ error: 'Invalid API key format. OpenAI keys start with "sk-"' });
+      }
+
+      // Validate the key by making a test API call
+      const isValid = await OpenAIHelper.validateKey(apiKey);
+
+      if (!isValid) {
+        return res.status(400).json({ error: 'Invalid API key. Please check and try again.' });
+      }
+
+      // Store in session
+      req.session.openaiApiKey = apiKey;
+
+      res.json({ success: true, source: 'session' });
+    } catch (error) {
+      console.error("Error configuring API key:", error);
+      res.status(500).json({ error: "Failed to configure API key" });
+    }
+  });
+
+  // Clear session API key
+  app.delete("/api/config/openai-key", (req, res) => {
+    delete req.session.openaiApiKey;
+    res.json({ success: true });
   });
 
   // Get S3 hierarchy (dates -> tasks -> models)
@@ -214,10 +267,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Missing dataset or runId parameter" });
       }
 
-      const result = await traceService.judgeTrace(dataset, runId);
+      // Get API key from session or environment
+      const apiKey = req.session.openaiApiKey || process.env.OPENAI_API_KEY;
+
+      const result = await traceService.judgeTrace(dataset, runId, apiKey);
       res.json(result);
     } catch (error) {
       console.error("Error generating trace judgment:", error);
+
+      // Handle missing API key error specifically
+      if (error instanceof Error && error.message === 'OPENAI_API_KEY_REQUIRED') {
+        return res.status(400).json({
+          error: "OPENAI_API_KEY_REQUIRED",
+          message: "OpenAI API key not configured. Please configure your API key in Settings."
+        });
+      }
+
       res.status(500).json({ error: "Failed to generate judgment" });
     }
   });
@@ -257,6 +322,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Task dataset routes
   app.get("/api/tasks/list", async (req, res) => {
     try {
+      const { dataset, limit, offset, skipSummary } = req.query;
+
+      if (!dataset || typeof dataset !== 'string') {
+        return res.status(400).json({ error: "Missing or invalid dataset parameter" });
+      }
+
+      const parsedLimit = limit ? parseInt(limit as string) : 50;
+      const parsedOffset = offset ? parseInt(offset as string) : 0;
+      const shouldSkipSummary = skipSummary === 'true';
+
+      // Get API key from session or environment
+      const apiKey = req.session.openaiApiKey || process.env.OPENAI_API_KEY;
+
+      const result = await taskService.listTasks(dataset, parsedLimit, parsedOffset, {
+        apiKey,
+        skipSummary: shouldSkipSummary,
+      });
+      res.json(result);
+    } catch (error) {
+      console.error("Error listing tasks:", error);
+      res.status(500).json({ error: "Failed to fetch tasks" });
+    }
+  });
+
+  app.get("/api/tasks/summary", async (req, res) => {
+    try {
       const { dataset, limit, offset } = req.query;
 
       if (!dataset || typeof dataset !== 'string') {
@@ -266,11 +357,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const parsedLimit = limit ? parseInt(limit as string) : 50;
       const parsedOffset = offset ? parseInt(offset as string) : 0;
 
-      const result = await taskService.listTasks(dataset, parsedLimit, parsedOffset);
+      // Get API key from session or environment
+      const apiKey = req.session.openaiApiKey || process.env.OPENAI_API_KEY;
+
+      const result = await taskService.generateSummary(dataset, parsedLimit, parsedOffset, apiKey);
       res.json(result);
     } catch (error) {
-      console.error("Error listing tasks:", error);
-      res.status(500).json({ error: "Failed to fetch tasks" });
+      console.error("Error generating task summary:", error);
+      res.status(500).json({ error: "Failed to generate summary" });
     }
   });
 

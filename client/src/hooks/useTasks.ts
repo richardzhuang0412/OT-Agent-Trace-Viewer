@@ -4,11 +4,17 @@ import type { TaskListResponse } from '@shared/schema';
 /**
  * Fetch task list from API
  */
-async function fetchTaskList(dataset: string, limit: number, offset: number): Promise<TaskListResponse> {
+async function fetchTaskList(
+  dataset: string,
+  limit: number,
+  offset: number,
+  skipSummary: boolean = false
+): Promise<TaskListResponse> {
   const params = new URLSearchParams({
     dataset,
     limit: limit.toString(),
     offset: offset.toString(),
+    skipSummary: skipSummary.toString(),
   });
 
   const response = await fetch(`/api/tasks/list?${params}`);
@@ -33,6 +39,30 @@ async function fetchTaskList(dataset: string, limit: number, offset: number): Pr
 }
 
 /**
+ * Fetch task summary from API (separate from task list)
+ */
+async function fetchTaskSummary(
+  dataset: string,
+  limit: number,
+  offset: number
+): Promise<{ summary: string; summaryError?: string }> {
+  const params = new URLSearchParams({
+    dataset,
+    limit: limit.toString(),
+    offset: offset.toString(),
+  });
+
+  const response = await fetch(`/api/tasks/summary?${params}`);
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: 'Unknown error' }));
+    throw new Error(error.error || 'Failed to fetch summary');
+  }
+
+  return response.json();
+}
+
+/**
  * Clear task cache for a dataset
  */
 async function clearTaskCache(dataset: string): Promise<void> {
@@ -49,12 +79,34 @@ async function clearTaskCache(dataset: string): Promise<void> {
 /**
  * Hook to fetch task list with pagination
  */
-export function useTaskList(dataset: string, limit: number = 50, offset: number = 0) {
+export function useTaskList(
+  dataset: string,
+  limit: number = 50,
+  offset: number = 0,
+  skipSummary: boolean = true
+) {
   return useQuery({
     queryKey: ['tasks', dataset, limit, offset],
-    queryFn: () => fetchTaskList(dataset, limit, offset),
+    queryFn: () => fetchTaskList(dataset, limit, offset, skipSummary),
     enabled: !!dataset,
     staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+}
+
+/**
+ * Hook to fetch task summary separately (for async loading)
+ * Note: Summary is dataset-level, not page-specific, so we always use offset=0
+ */
+export function useTaskSummary(
+  dataset: string,
+  enabled: boolean = true
+) {
+  return useQuery({
+    queryKey: ['taskSummary', dataset],
+    queryFn: () => fetchTaskSummary(dataset, 50, 0), // Always use first 50 tasks for summary
+    enabled: !!dataset && enabled,
+    staleTime: 10 * 60 * 1000, // 10 minutes - summaries don't change often
+    retry: 1, // Only retry once for summaries
   });
 }
 

@@ -10,7 +10,7 @@ export class TaskSummaryHelper {
   async generateDatasetSummary(
     dataset: string,
     tasks: TaskDetail[],
-    options?: { model?: string },
+    options?: { model?: string; apiKey?: string },
   ): Promise<string> {
     if (tasks.length === 0) {
       return "Summary not available.";
@@ -35,6 +35,7 @@ export class TaskSummaryHelper {
         model: options?.model || "gpt-5-mini",
         maxCompletionTokens: 8192,
         reasoningEffort: "medium",
+        apiKey: options?.apiKey,
       });
 
       console.log(
