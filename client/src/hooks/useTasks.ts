@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { TaskListResponse } from '@shared/schema';
+import { apiFetch } from '@/lib/queryClient';
 
 /**
  * Fetch task list from API
@@ -17,7 +18,7 @@ async function fetchTaskList(
     skipSummary: skipSummary.toString(),
   });
 
-  const response = await fetch(`/api/tasks/list?${params}`);
+  const response = await apiFetch(`/api/tasks/list?${params}`);
 
   // Check if response is JSON before attempting to parse
   const contentType = response.headers.get('content-type');
@@ -52,7 +53,7 @@ async function fetchTaskSummary(
     offset: offset.toString(),
   });
 
-  const response = await fetch(`/api/tasks/summary?${params}`);
+  const response = await apiFetch(`/api/tasks/summary?${params}`);
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({ error: 'Unknown error' }));
@@ -66,7 +67,7 @@ async function fetchTaskSummary(
  * Clear task cache for a dataset
  */
 async function clearTaskCache(dataset: string): Promise<void> {
-  const response = await fetch(`/api/tasks/${encodeURIComponent(dataset)}/clear-cache`, {
+  const response = await apiFetch(`/api/tasks/${encodeURIComponent(dataset)}/clear-cache`, {
     method: 'POST',
   });
 

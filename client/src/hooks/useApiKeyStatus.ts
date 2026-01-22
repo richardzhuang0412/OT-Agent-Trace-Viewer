@@ -1,20 +1,12 @@
 import { useQuery } from '@tanstack/react-query';
 import type { ApiKeyStatus } from '@shared/schema';
-import { retrieveApiKey } from '@/lib/apiKeyStorage';
+import { apiFetch } from '@/lib/queryClient';
 
 export function useApiKeyStatus() {
   return useQuery<ApiKeyStatus>({
     queryKey: ['apiKeyStatus'],
     queryFn: async () => {
-      const localKey = retrieveApiKey();
-      const headers: HeadersInit = localKey
-        ? { 'X-OpenAI-Api-Key': localKey }
-        : {};
-
-      const response = await fetch('/api/config/openai-status', {
-        headers,
-        credentials: 'include',
-      });
+      const response = await apiFetch('/api/config/openai-status');
       if (!response.ok) {
         throw new Error('Failed to fetch API key status');
       }

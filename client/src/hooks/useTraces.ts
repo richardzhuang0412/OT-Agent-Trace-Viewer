@@ -1,5 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { AtifTrace, TraceFilterParams, TraceListResponse, TraceMetadata } from "@shared/schema";
+import { apiFetch } from "@/lib/queryClient";
 
 /**
  * Helper to check if response is JSON and parse it safely
@@ -40,7 +41,7 @@ export function useTraceList(dataset: string, filters: Partial<TraceFilterParams
         }, {} as Record<string, string>),
       });
 
-      const response = await fetch(`/api/traces/list?${params}`);
+      const response = await apiFetch(`/api/traces/list?${params}`);
       return parseJsonResponse<TraceListResponse>(response, 'Failed to fetch traces');
     },
     enabled: !!dataset,
@@ -55,7 +56,7 @@ export function useTrace(dataset: string, runId: string) {
   return useQuery<AtifTrace>({
     queryKey: ["/api/traces", dataset, runId],
     queryFn: async () => {
-      const response = await fetch(`/api/traces/${dataset}/${runId}`);
+      const response = await apiFetch(`/api/traces/${dataset}/${runId}`);
       return parseJsonResponse<AtifTrace>(response, 'Failed to fetch trace');
     },
     enabled: !!dataset && !!runId,
@@ -70,7 +71,7 @@ export function useTraceMetadata(dataset: string) {
   return useQuery<TraceMetadata>({
     queryKey: ["/api/traces/metadata", dataset],
     queryFn: async () => {
-      const response = await fetch(`/api/traces/${dataset}/metadata`);
+      const response = await apiFetch(`/api/traces/${dataset}/metadata`);
       return parseJsonResponse<TraceMetadata>(response, 'Failed to fetch metadata');
     },
     enabled: !!dataset,
@@ -86,7 +87,7 @@ export function useClearTraceCache() {
 
   const clearCache = async (dataset: string) => {
     try {
-      const response = await fetch(`/api/traces/${dataset}/clear-cache`, {
+      const response = await apiFetch(`/api/traces/${dataset}/clear-cache`, {
         method: "POST",
       });
       

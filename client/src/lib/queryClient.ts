@@ -13,6 +13,24 @@ function getApiKeyHeaders(): Record<string, string> {
   return apiKey ? { 'X-OpenAI-Api-Key': apiKey } : {};
 }
 
+// Centralized fetch wrapper that injects API key header
+export async function apiFetch(
+  url: string,
+  options: RequestInit = {}
+): Promise<Response> {
+  const existingHeaders = options.headers as Record<string, string> | undefined;
+  const headers: Record<string, string> = {
+    ...getApiKeyHeaders(),
+    ...(existingHeaders || {}),
+  };
+
+  return fetch(url, {
+    ...options,
+    headers,
+    credentials: 'include',
+  });
+}
+
 export async function apiRequest(
   method: string,
   url: string,

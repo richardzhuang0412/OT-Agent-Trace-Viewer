@@ -18,6 +18,7 @@ import type { MouseEvent } from 'react';
 import { ConversationViewer } from './ConversationViewer';
 import { PaginationControls } from './PaginationControls';
 import { ApiKeyConfigModal } from './ApiKeyConfigModal';
+import { apiFetch } from '@/lib/queryClient';
 
 interface TraceListViewerProps {
   traces: AtifTrace[];
@@ -211,7 +212,7 @@ const TraceRow = memo(function TraceRow({
       setJudgeError(null);
 
       try {
-        const response = await fetch(
+        const response = await apiFetch(
           `/api/traces/${encodeURIComponent(datasetId)}/${encodeURIComponent(trace.run_id)}/judge`,
           { method: 'POST' },
         );

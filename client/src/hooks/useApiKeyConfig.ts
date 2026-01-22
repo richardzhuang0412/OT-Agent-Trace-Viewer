@@ -1,18 +1,18 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import type { ApiKeyConfigResponse } from '@shared/schema';
 import { storeApiKey, clearApiKey } from '@/lib/apiKeyStorage';
+import { apiFetch } from '@/lib/queryClient';
 
 export function useApiKeyConfig() {
   const queryClient = useQueryClient();
 
   const configureKey = useMutation<ApiKeyConfigResponse, Error, { apiKey: string }>({
     mutationFn: async ({ apiKey }) => {
-      const response = await fetch('/api/config/openai-key', {
+      const response = await apiFetch('/api/config/openai-key', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        credentials: 'include',
         body: JSON.stringify({ apiKey }),
       });
 
@@ -37,9 +37,8 @@ export function useApiKeyConfig() {
       // Clear from localStorage
       clearApiKey();
 
-      const response = await fetch('/api/config/openai-key', {
+      const response = await apiFetch('/api/config/openai-key', {
         method: 'DELETE',
-        credentials: 'include',
       });
 
       if (!response.ok) {

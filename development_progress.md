@@ -230,3 +230,70 @@ Created utility for localStorage operations with basic obfuscation:
 3. **Browser isolation test:**
    - Open in incognito → should prompt for key
    - Different browser → should have independent key
+
+---
+
+## Task: Fix API Key Header Injection for All Fetch Calls
+
+### Context
+The previous client-side localStorage implementation only injected the `X-OpenAI-Api-Key` header in `queryClient.ts` functions (`apiRequest`, `getQueryFn`). However, most of the codebase used direct `fetch()` calls that bypassed this centralized header injection.
+
+### Evidence from Replit Logs
+```
+GET /api/config/openai-status 200 → {"hasKey":true,"source":"client"}  ✓ Works
+POST /api/traces/.../judge → Error: OPENAI_API_KEY_REQUIRED  ✗ Fails
+```
+
+### Root Cause
+**10 direct fetch() calls** across 5 files were bypassing the header injection:
+- `TraceListViewer.tsx` (1 call) - judge endpoint
+- `useTasks.ts` (3 calls) - list, summary, clear-cache
+- `useTraces.ts` (4 calls) - list, single trace, metadata, clear-cache
+- `useApiKeyConfig.ts` (2 calls) - POST/DELETE openai-key
+
+### Solution
+Created a centralized `apiFetch` function that always injects the API key header, then refactored all fetch calls to use it.
+
+### Changes Made (Completed)
+
+#### 1. `client/src/lib/queryClient.ts`
+Added new `apiFetch` function:
+```typescript
+export async function apiFetch(
+  url: string,
+  options: RequestInit = {}
+): Promise<Response> {
+  const headers = {
+    ...getApiKeyHeaders(),
+    ...(options.headers || {}),
+  };
+  return fetch(url, { ...options, headers, credentials: 'include' });
+}
+```
+
+#### 2. `client/src/components/TraceListViewer.tsx`
+- Added import for `apiFetch`
+- Updated judge fetch call to use `apiFetch`
+
+#### 3. `client/src/hooks/useTasks.ts`
+- Added import for `apiFetch`
+- Updated 3 fetch calls: `tasks/list`, `tasks/summary`, `clear-cache`
+
+#### 4. `client/src/hooks/useTraces.ts`
+- Added import for `apiFetch`
+- Updated 4 fetch calls: `traces/list`, single trace, `metadata`, `clear-cache`
+
+#### 5. `client/src/hooks/useApiKeyConfig.ts`
+- Added import for `apiFetch`
+- Updated 2 fetch calls: POST and DELETE
+
+#### 6. `client/src/hooks/useApiKeyStatus.ts`
+- Simplified to use `apiFetch` (removes manual header handling)
+
+### Verification
+- TypeScript type checking passed (`npm run check`)
+
+### Testing on Replit
+1. Configure API key → status should turn green
+2. Click "Judge Trace" → should work (key sent via header)
+3. Refresh page → key persists in localStorage
