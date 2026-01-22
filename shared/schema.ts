@@ -273,7 +273,7 @@ export type TaskListResponse = z.infer<typeof taskListResponseSchema>;
 // API Key Configuration Schemas
 export const ApiKeyStatusSchema = z.object({
   hasKey: z.boolean(),
-  source: z.enum(['environment', 'session', 'none']),
+  source: z.enum(['environment', 'session', 'client', 'none']),
 });
 
 export const ApiKeyConfigRequestSchema = z.object({
@@ -282,7 +282,7 @@ export const ApiKeyConfigRequestSchema = z.object({
 
 export const ApiKeyConfigResponseSchema = z.object({
   success: z.boolean(),
-  source: z.enum(['session']),
+  source: z.enum(['session', 'client']),
 });
 
 export const ApiKeyErrorSchema = z.object({

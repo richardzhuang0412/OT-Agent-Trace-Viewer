@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import type { ApiKeyConfigResponse } from '@shared/schema';
+import { storeApiKey, clearApiKey } from '@/lib/apiKeyStorage';
 
 export function useApiKeyConfig() {
   const queryClient = useQueryClient();
@@ -20,7 +21,10 @@ export function useApiKeyConfig() {
         throw new Error(error.error || 'Failed to configure API key');
       }
 
-      return response.json();
+      const result = await response.json();
+      // Store in localStorage after server validates the key
+      storeApiKey(apiKey);
+      return result;
     },
     onSuccess: () => {
       // Invalidate API key status query to refetch
@@ -28,8 +32,11 @@ export function useApiKeyConfig() {
     },
   });
 
-  const clearKey = useMutation<{ success: boolean }, Error>({
+  const clearKeyMutation = useMutation<{ success: boolean }, Error>({
     mutationFn: async () => {
+      // Clear from localStorage
+      clearApiKey();
+
       const response = await fetch('/api/config/openai-key', {
         method: 'DELETE',
         credentials: 'include',
@@ -49,6 +56,6 @@ export function useApiKeyConfig() {
 
   return {
     configureKey,
-    clearKey,
+    clearKey: clearKeyMutation,
   };
 }

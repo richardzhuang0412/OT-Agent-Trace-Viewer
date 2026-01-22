@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request } from "express";
 import { createServer, type Server } from "http";
 import { S3Service } from "./services/s3Service";
 import { TraceService } from "./services/traceService";
@@ -8,6 +8,13 @@ import { SummaryHelper } from "./services/summaryHelper";
 import { JudgeHelper } from "./services/judgeHelper";
 import { TaskSummaryHelper } from "./services/taskSummaryHelper";
 import { HfService } from "./services/hfService";
+
+// Helper to get API key from header (client-side storage) or environment
+function getApiKey(req: Request): string | undefined {
+  const headerKey = req.headers['x-openai-api-key'] as string | undefined;
+  if (headerKey?.startsWith('sk-')) return headerKey;
+  return process.env.OPENAI_API_KEY;
+}
 
 export async function registerRoutes(app: Express): Promise<Server> {
   const s3Service = new S3Service();
@@ -34,18 +41,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get OpenAI API key configuration status
   app.get("/api/config/openai-status", (req, res) => {
     const envKey = process.env.OPENAI_API_KEY;
-    const sessionKey = req.session.openaiApiKey;
+    const headerKey = req.headers['x-openai-api-key'] as string | undefined;
 
     if (envKey) {
       res.json({ hasKey: true, source: 'environment' });
-    } else if (sessionKey) {
-      res.json({ hasKey: true, source: 'session' });
+    } else if (headerKey?.startsWith('sk-')) {
+      res.json({ hasKey: true, source: 'client' });
     } else {
       res.json({ hasKey: false, source: 'none' });
     }
   });
 
-  // Configure OpenAI API key for this session
+  // Validate OpenAI API key (client stores it locally after validation)
   app.post("/api/config/openai-key", async (req, res) => {
     try {
       const { apiKey } = req.body;
@@ -66,19 +73,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: 'Invalid API key. Please check and try again.' });
       }
 
-      // Store in session
-      req.session.openaiApiKey = apiKey;
-
-      res.json({ success: true, source: 'session' });
+      // Key is valid - client will store it in localStorage
+      res.json({ success: true, source: 'client' });
     } catch (error) {
       console.error("Error configuring API key:", error);
       res.status(500).json({ error: "Failed to configure API key" });
     }
   });
 
-  // Clear session API key
-  app.delete("/api/config/openai-key", (req, res) => {
-    delete req.session.openaiApiKey;
+  // Clear API key endpoint (client clears localStorage, this is a no-op but kept for API consistency)
+  app.delete("/api/config/openai-key", (_req, res) => {
     res.json({ success: true });
   });
 
@@ -267,8 +271,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Missing dataset or runId parameter" });
       }
 
-      // Get API key from session or environment
-      const apiKey = req.session.openaiApiKey || process.env.OPENAI_API_KEY;
+      // Get API key from header or environment
+      const apiKey = getApiKey(req);
 
       const result = await traceService.judgeTrace(dataset, runId, apiKey);
       res.json(result);
@@ -332,8 +336,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const parsedOffset = offset ? parseInt(offset as string) : 0;
       const shouldSkipSummary = skipSummary === 'true';
 
-      // Get API key from session or environment
-      const apiKey = req.session.openaiApiKey || process.env.OPENAI_API_KEY;
+      // Get API key from header or environment
+      const apiKey = getApiKey(req);
 
       const result = await taskService.listTasks(dataset, parsedLimit, parsedOffset, {
         apiKey,
@@ -357,8 +361,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const parsedLimit = limit ? parseInt(limit as string) : 50;
       const parsedOffset = offset ? parseInt(offset as string) : 0;
 
-      // Get API key from session or environment
-      const apiKey = req.session.openaiApiKey || process.env.OPENAI_API_KEY;
+      // Get API key from header or environment
+      const apiKey = getApiKey(req);
 
       const result = await taskService.generateSummary(dataset, parsedLimit, parsedOffset, apiKey);
       res.json(result);

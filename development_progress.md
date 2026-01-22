@@ -154,3 +154,79 @@ Ready for deployment testing. Verify:
 1. Configure an API key → status indicator stays green
 2. Refresh the page → status still shows green (session persists)
 3. Test on deployed environment (e.g., Replit)
+
+---
+
+## Task: Client-Side API Key Storage for Replit Deployment
+
+### Context
+API key configuration worked locally but failed on Replit. After entering an API key, the status immediately showed "not configured" again.
+
+### Root Cause
+The server was using **in-memory session storage** (default MemoryStore). When Replit restarts/cycles containers, all session data was lost. This is a fundamental limitation—no cookie/credential fixes could help because the server-side storage was ephemeral.
+
+### Solution
+Store the API key in **browser localStorage** instead of server sessions. The key is sent via HTTP header (`X-OpenAI-Api-Key`) with each request that needs it.
+
+**Why this approach:**
+- localStorage persists across server restarts (data lives in browser)
+- No external database needed (Redis, PostgreSQL, etc.)
+- Each browser/device has isolated storage
+- Industry-standard pattern (similar to bearer tokens)
+
+### Changes Made (Completed)
+
+#### 1. NEW: `client/src/lib/apiKeyStorage.ts`
+Created utility for localStorage operations with basic obfuscation:
+- `storeApiKey(apiKey)` - stores base64-encoded key with prefix
+- `retrieveApiKey()` - retrieves and decodes key
+- `clearApiKey()` - removes from localStorage
+- `hasStoredApiKey()` - checks if key exists
+
+#### 2. `shared/schema.ts`
+- Added 'client' to `ApiKeyStatusSchema.source` enum: `['environment', 'session', 'client', 'none']`
+- Added 'client' to `ApiKeyConfigResponseSchema.source` enum: `['session', 'client']`
+
+#### 3. `server/routes.ts`
+- Added helper function `getApiKey(req)` to check header then environment
+- Updated `/api/config/openai-status` to check header for client-stored key
+- Updated `/api/config/openai-key` POST to validate only (not store in session)
+- Updated `/api/config/openai-key` DELETE to be a no-op (client clears localStorage)
+- Updated `/api/traces/:dataset/:runId/judge` to use `getApiKey(req)`
+- Updated `/api/tasks/list` to use `getApiKey(req)`
+- Updated `/api/tasks/summary` to use `getApiKey(req)`
+
+#### 4. `client/src/hooks/useApiKeyConfig.ts`
+- Import `storeApiKey`, `clearApiKey` from apiKeyStorage
+- After successful server validation, store key in localStorage
+- On clear, remove from localStorage before server call
+
+#### 5. `client/src/hooks/useApiKeyStatus.ts`
+- Import `retrieveApiKey` from apiKeyStorage
+- Send key in `X-OpenAI-Api-Key` header when checking status
+
+#### 6. `client/src/lib/queryClient.ts`
+- Import `retrieveApiKey` from apiKeyStorage
+- Added `getApiKeyHeaders()` helper function
+- Updated `apiRequest()` to include API key header
+- Updated `getQueryFn()` to include API key header
+
+### Verification
+- TypeScript type checking passed (`npm run check`)
+
+### Testing Checklist
+1. **Local test:**
+   - Run `npm run dev`
+   - Configure API key → status turns green
+   - Refresh page → status stays green (key in localStorage)
+
+2. **Replit test:**
+   - Deploy to Replit
+   - Configure API key → status turns green
+   - Wait for container restart or trigger one
+   - Refresh → status should still be green
+   - Test "Judge Traces" feature works
+
+3. **Browser isolation test:**
+   - Open in incognito → should prompt for key
+   - Different browser → should have independent key
