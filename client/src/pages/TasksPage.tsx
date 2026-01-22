@@ -1,13 +1,17 @@
+import { ApiKeyConfigModal } from '@/components/ApiKeyConfigModal';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Search, FolderOpen, ArrowLeft } from 'lucide-react';
+import { useApiKeyStatus } from '@/hooks/useApiKeyStatus';
+import { Search, FolderOpen, ArrowLeft, Settings } from 'lucide-react';
 import { useState } from 'react';
 import { useLocation } from 'wouter';
 
 export default function TasksPage() {
   const [, setLocation] = useLocation();
   const [datasetName, setDatasetName] = useState('');
+  const [showApiKeyModal, setShowApiKeyModal] = useState(false);
+  const { data: apiKeyStatus } = useApiKeyStatus();
 
   const handleGoToTasks = () => {
     if (datasetName.trim()) {
@@ -19,15 +23,27 @@ export default function TasksPage() {
     <div className="min-h-screen bg-background dark:bg-gray-950 p-8">
       <div className="max-w-4xl mx-auto">
         <div className="mb-8">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setLocation('/')}
-            className="mb-4 gap-2"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back to Home
-          </Button>
+          <div className="flex items-center gap-4 mb-4">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setLocation('/')}
+              className="gap-2"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back to Home
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowApiKeyModal(true)}
+              className="gap-2"
+            >
+              <Settings className="h-4 w-4" />
+              API Key
+              <div className={`w-2 h-2 rounded-full ${apiKeyStatus?.hasKey ? 'bg-green-500' : 'bg-gray-400'}`} />
+            </Button>
+          </div>
           <h1 className="text-4xl font-bold text-foreground dark:text-white mb-2">
             Task Dataset Viewer
           </h1>
@@ -111,6 +127,12 @@ Archive contents typically include:
             </CardContent>
           </Card>
         </div>
+
+        {/* API Key Configuration Modal */}
+        <ApiKeyConfigModal
+          open={showApiKeyModal}
+          onOpenChange={setShowApiKeyModal}
+        />
       </div>
     </div>
   );

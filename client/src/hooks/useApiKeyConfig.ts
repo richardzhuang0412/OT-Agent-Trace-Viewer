@@ -11,6 +11,7 @@ export function useApiKeyConfig() {
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({ apiKey }),
       });
 
@@ -31,6 +32,7 @@ export function useApiKeyConfig() {
     mutationFn: async () => {
       const response = await fetch('/api/config/openai-key', {
         method: 'DELETE',
+        credentials: 'include',
       });
 
       if (!response.ok) {

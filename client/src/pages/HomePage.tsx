@@ -135,7 +135,7 @@ export default function HomePage() {
                 and identifying patterns in agent interactions.
               </p>
               <p className="mt-2 text-xs">
-                Example: <code className="bg-gray-200 dark:bg-gray-700 px-2 py-1 rounded">DCAgent2/my-traces-dataset</code>
+                Example: <code className="bg-gray-200 dark:bg-gray-700 px-2 py-1 rounded">DCAgent2/DCAgent_dev_set_71_tasks_DCAgent_nl2bash-nl2bash-bugsseq_Qwen3-8B-maxEps24-11291867e6d9</code>
               </p>
             </div>
           </div>

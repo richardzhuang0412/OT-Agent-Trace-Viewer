@@ -5,7 +5,9 @@ export function useApiKeyStatus() {
   return useQuery<ApiKeyStatus>({
     queryKey: ['apiKeyStatus'],
     queryFn: async () => {
-      const response = await fetch('/api/config/openai-status');
+      const response = await fetch('/api/config/openai-status', {
+        credentials: 'include',
+      });
       if (!response.ok) {
         throw new Error('Failed to fetch API key status');
       }

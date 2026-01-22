@@ -1,13 +1,17 @@
+import { ApiKeyConfigModal } from '@/components/ApiKeyConfigModal';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Search, Zap, ArrowLeft } from 'lucide-react';
+import { useApiKeyStatus } from '@/hooks/useApiKeyStatus';
+import { Search, Zap, ArrowLeft, Settings } from 'lucide-react';
 import { useState } from 'react';
 import { useLocation } from 'wouter';
 
 export default function TracesPage() {
   const [, setLocation] = useLocation();
   const [datasetName, setDatasetName] = useState('');
+  const [showApiKeyModal, setShowApiKeyModal] = useState(false);
+  const { data: apiKeyStatus } = useApiKeyStatus();
 
   const handleGoToTraces = () => {
     if (datasetName.trim()) {
@@ -19,15 +23,27 @@ export default function TracesPage() {
     <div className="min-h-screen bg-background dark:bg-gray-950 p-8">
       <div className="max-w-4xl mx-auto">
         <div className="mb-8">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setLocation('/')}
-            className="mb-4 gap-2"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back to Home
-          </Button>
+          <div className="flex items-center gap-4 mb-4">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setLocation('/')}
+              className="gap-2"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back to Home
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowApiKeyModal(true)}
+              className="gap-2"
+            >
+              <Settings className="h-4 w-4" />
+              API Key
+              <div className={`w-2 h-2 rounded-full ${apiKeyStatus?.hasKey ? 'bg-green-500' : 'bg-gray-400'}`} />
+            </Button>
+          </div>
           <h1 className="text-4xl font-bold text-foreground dark:text-white mb-2">
             ATIF Trace Viewer
           </h1>
@@ -49,7 +65,7 @@ export default function TracesPage() {
           <CardContent>
             <div className="flex gap-2">
               <Input
-                placeholder="e.g., DCAgent2/my-traces-dataset"
+                placeholder="e.g., DCAgent2/DCAgent_dev_set_71_tasks_DCAgent_nl2bash-nl2bash-bugsseq_Qwen3-8B-maxEps24-11291867e6d9"
                 value={datasetName}
                 onChange={(e) => setDatasetName(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleGoToTraces()}
@@ -117,9 +133,18 @@ export default function TracesPage() {
   ]
 }`}
               </pre>
+              <p className="text-sm text-muted-foreground dark:text-gray-400 mt-4">
+                Example dataset: <code className="font-mono bg-gray-200 dark:bg-gray-700 px-2 py-1 rounded">DCAgent2/DCAgent_dev_set_71_tasks_DCAgent_nl2bash-nl2bash-bugsseq_Qwen3-8B-maxEps24-11291867e6d9</code>
+              </p>
             </CardContent>
           </Card>
         </div>
+
+        {/* API Key Configuration Modal */}
+        <ApiKeyConfigModal
+          open={showApiKeyModal}
+          onOpenChange={setShowApiKeyModal}
+        />
       </div>
     </div>
   );

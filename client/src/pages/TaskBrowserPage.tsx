@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { useClearTaskCache, useTaskList, useTaskSummary } from '@/hooks/useTasks';
+import { useApiKeyStatus } from '@/hooks/useApiKeyStatus';
 import { getRandomTaskPage } from '@/lib/taskSampler';
 import { ArrowLeft, ExternalLink, RefreshCw, Shuffle, Info, Settings, Loader2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
@@ -38,6 +39,7 @@ export default function TaskBrowserPage() {
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { data: apiKeyStatus } = useApiKeyStatus();
 
   // Check if summary error is due to missing API key
   const isApiKeyRequired = summaryData?.summaryError === 'OPENAI_API_KEY_REQUIRED';
@@ -139,6 +141,16 @@ export default function TaskBrowserPage() {
             >
               <ExternalLink className="h-4 w-4" />
               View on HuggingFace
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowApiKeyModal(true)}
+              className="gap-2"
+            >
+              <Settings className="h-4 w-4" />
+              API Key
+              <div className={`w-2 h-2 rounded-full ${apiKeyStatus?.hasKey ? 'bg-green-500' : 'bg-gray-400'}`} />
             </Button>
           </div>
 

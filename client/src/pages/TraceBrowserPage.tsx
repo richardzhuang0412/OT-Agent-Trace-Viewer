@@ -1,11 +1,13 @@
+import { ApiKeyConfigModal } from '@/components/ApiKeyConfigModal';
 import { TraceFilterPanel } from '@/components/TraceFilterPanel';
 import { TraceListViewer } from '@/components/TraceListViewer';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { useApiKeyStatus } from '@/hooks/useApiKeyStatus';
 import { useToast } from '@/hooks/use-toast';
 import { useClearTraceCache, useTraceList } from '@/hooks/useTraces';
 import type { TraceFilterParams } from '@shared/schema';
-import { ArrowLeft, ExternalLink, RefreshCw } from 'lucide-react';
+import { ArrowLeft, ExternalLink, RefreshCw, Settings } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useParams } from 'wouter';
 
@@ -17,7 +19,9 @@ export default function TraceBrowserPage() {
   const [filters, setFilters] = useState<Partial<TraceFilterParams>>({});
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(50);
+  const [showApiKeyModal, setShowApiKeyModal] = useState(false);
   const { toast } = useToast();
+  const { data: apiKeyStatus } = useApiKeyStatus();
   const lastWarningRef = useRef<string | null>(null);
 
   // Calculate offset from page and page size
@@ -117,6 +121,16 @@ export default function TraceBrowserPage() {
               <ExternalLink className="h-4 w-4" />
               View on HuggingFace
             </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowApiKeyModal(true)}
+              className="gap-2"
+            >
+              <Settings className="h-4 w-4" />
+              API Key
+              <div className={`w-2 h-2 rounded-full ${apiKeyStatus?.hasKey ? 'bg-green-500' : 'bg-gray-400'}`} />
+            </Button>
           </div>
 
           <h1 className="text-4xl font-bold text-foreground dark:text-white mb-2">
@@ -215,6 +229,12 @@ export default function TraceBrowserPage() {
             />
           </div>
         </div>
+
+        {/* API Key Configuration Modal */}
+        <ApiKeyConfigModal
+          open={showApiKeyModal}
+          onOpenChange={setShowApiKeyModal}
+        />
       </div>
     </div>
   );
